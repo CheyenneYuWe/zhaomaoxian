@@ -1,0 +1,671 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>对昭矛线的了解度测试</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700;900&display=swap" rel="stylesheet">
+<style>
+
+  /* ============================================================
+     LEADERBOARD BACKEND CONFIG
+     This page uses kvdb.io — a free, no-login key-value store —
+     so the leaderboard works on a plain static host like GitHub
+     Pages (no server needed). One-time setup before you deploy:
+
+     1. Run this once, anywhere with curl (terminal / Replit / etc):
+          curl -d "email=you@example.com" https://kvdb.io
+        It returns a bucket ID, e.g. "Fd55uogXyxYdnXJvnyN8Xo".
+     2. Paste that ID into KVDB_BUCKET_ID in the <script> below,
+        replacing "PASTE_YOUR_BUCKET_ID_HERE".
+     3. Push this file to a GitHub repo, enable GitHub Pages, done.
+
+     Note: this bucket has no password — anyone who has this page's
+     source can read/write it. Fine for a casual leaderboard among
+     friends, not for anything sensitive.
+     ============================================================ */
+
+  :root{
+    --bg:#f6f4ee;
+    --panel:#ffffff;
+    --ink:#191714;
+    --ink-soft:#5b564d;
+    --line:#191714;
+    --accent:#e8462f;
+    --accent-soft:#fbe4de;
+    --good:#1c7a4a;
+    --good-soft:#e2f2e6;
+    --bad:#b5311f;
+    --bad-soft:#fbe4de;
+    --blue:#2856d8;
+    --blue-soft:#e3eaf9;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--bg);
+    color:var(--ink);
+    font-family:"Noto Sans SC","PingFang SC","Microsoft YaHei",sans-serif;
+    min-height:100vh;
+    display:flex;
+    justify-content:center;
+    padding:40px 16px 72px;
+  }
+  .stage{width:100%; max-width:560px;}
+
+  .brand{margin-bottom:20px;}
+  .brand .kicker{
+    font-size:12px;
+    font-weight:700;
+    letter-spacing:.04em;
+    color:var(--accent);
+    margin-bottom:6px;
+  }
+  .brand h1{
+    font-size:30px;
+    font-weight:900;
+    line-height:1.3;
+    margin:0;
+    letter-spacing:.01em;
+  }
+
+  .card{
+    background:var(--panel);
+    border:2px solid var(--ink);
+    padding:28px 24px;
+  }
+
+  .lead-text{
+    font-size:15px;
+    line-height:1.75;
+    margin:0 0 22px;
+    color:var(--ink-soft);
+  }
+  .name-row{display:flex; gap:8px;}
+  .name-row input{
+    flex:1;
+    min-width:0;
+    background:var(--bg);
+    border:2px solid var(--ink);
+    padding:13px 14px;
+    color:var(--ink);
+    font-size:15px;
+    font-family:inherit;
+  }
+  .name-row input:focus{outline:none; border-color:var(--accent);}
+  .btn{
+    border:2px solid var(--ink);
+    padding:13px 16px;
+    font-family:inherit;
+    font-size:14px;
+    font-weight:700;
+    cursor:pointer;
+    background:var(--panel);
+    color:var(--ink);
+    white-space:nowrap;
+  }
+  .btn:hover{background:var(--bg);}
+  @media (hover:hover) and (pointer:fine){
+    .btn:hover{background:var(--bg);}
+    .btn-primary:hover{background:var(--blue); border-color:var(--blue);}
+    .option:hover{background:var(--bg);}
+  }
+  .btn:active{transform:translateY(1px);}
+  .btn-primary{
+    background:var(--ink);
+    color:var(--panel);
+    border-color:var(--ink);
+  }
+  .btn-block{width:100%;}
+  .hint{font-size:12.5px; color:var(--ink-soft); margin-top:10px;}
+  .confirm-row{margin-top:14px;}
+
+  .warning-box p{
+    font-size:14.5px;
+    line-height:1.9;
+    margin:0 0 10px;
+    color:var(--ink-soft);
+  }
+  .warning-box p.angry{color:var(--accent); font-weight:700;}
+  .final-choice{margin-top:20px; display:flex; flex-direction:column; gap:8px;}
+
+  .progress-wrap{margin-bottom:20px;}
+  .progress-top{
+    display:flex; justify-content:space-between;
+    font-size:12px; font-weight:700; color:var(--ink-soft);
+    margin-bottom:8px;
+  }
+  .progress-bar{height:4px; background:var(--accent-soft);}
+  .progress-fill{height:100%; background:var(--ink); transition:width .25s ease;}
+
+  .q-multi-tag{
+    display:inline-block;
+    font-size:11px; font-weight:700;
+    background:var(--accent-soft);
+    color:var(--accent);
+    padding:3px 8px;
+    margin-bottom:10px;
+  }
+  .q-text{font-size:18px; font-weight:900; line-height:1.6; margin:2px 0 18px;}
+  .options{display:flex; flex-direction:column; gap:8px;}
+  .option{
+    text-align:left;
+    background:var(--panel);
+    border:2px solid var(--ink);
+    padding:12px 14px;
+    color:var(--ink);
+    font-size:14.5px;
+    cursor:pointer;
+    display:flex; gap:10px; align-items:flex-start;
+    font-family:inherit;
+  }
+  .option .tag{
+    flex:none; width:22px; height:22px;
+    border:2px solid var(--ink);
+    display:flex; align-items:center; justify-content:center;
+    font-size:12px; font-weight:900;
+  }
+  .option.selected{border-color:var(--blue); background:var(--blue-soft);}
+  .option.selected .tag{background:var(--blue); color:#fff; border-color:var(--blue);}
+  .option.correct{border-color:var(--good); background:var(--good-soft);}
+  .option.correct .tag{background:var(--good); color:#fff; border-color:var(--good);}
+  .option.wrong{border-color:var(--bad); background:var(--bad-soft);}
+  .option.wrong .tag{background:var(--bad); color:#fff; border-color:var(--bad);}
+  .option[disabled]{cursor:default;}
+
+  .nav-row{display:flex; justify-content:flex-end; margin-top:20px;}
+
+  .result-score{margin-bottom:2px;}
+  .result-score .num{font-size:56px; font-weight:900; line-height:1;}
+  .result-score .out-of{font-size:13px; color:var(--ink-soft); font-weight:700;}
+  .tier-title{font-size:21px; font-weight:900; margin:10px 0 8px; color:var(--accent);}
+  .tier-desc{font-size:14.5px; line-height:1.85; color:var(--ink-soft); margin:0 0 22px; white-space:pre-line;}
+  .tier-desc.empty{display:none;}
+
+  .result-actions{display:flex; gap:8px; margin-bottom:4px;}
+  .divider{border:none; border-top:2px dashed var(--ink); margin:26px 0 18px;}
+
+  .board-title{font-size:14px; font-weight:900; margin-bottom:4px;}
+  .board-sub{font-size:12px; color:var(--ink-soft); margin-bottom:12px;}
+  .board-list{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:6px;}
+  .board-row{
+    display:flex; align-items:center; gap:10px;
+    border:2px solid var(--ink);
+    padding:8px 12px; font-size:13.5px;
+  }
+  .board-row .rank{flex:none; width:20px; font-weight:900;}
+  .board-row .name{flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .board-row .score{flex:none; font-weight:900; color:var(--accent);}
+  .board-row.me{background:var(--accent-soft); border-color:var(--accent);}
+  .board-empty, .board-loading{font-size:13px; color:var(--ink-soft); padding:8px 0;}
+
+  .footer-note{font-size:11.5px; color:var(--ink-soft); margin-top:22px;}
+
+  .screen{display:none;}
+  .screen.active{display:block;}
+
+  @media (max-width:420px){
+    .brand h1{font-size:24px;}
+    .card{padding:20px 16px;}
+    .result-score .num{font-size:44px;}
+  }
+</style>
+</head>
+<body>
+
+<div class="stage">
+  <div class="brand">
+    <h1>对昭矛线的了解度测试</h1>
+  </div>
+
+  <div class="card">
+
+    <!-- Screen 1: nickname -->
+    <div class="screen active" id="screen-nickname">
+      <div class="name-row">
+        <input type="text" id="nicknameInput" placeholder="你是哪个..." maxlength="20">
+        <button class="btn" id="btnSkipToWarning">就不告诉你</button>
+      </div>
+      <p class="hint" id="nameError" style="display:none; color:var(--accent); font-weight:700;">告诉我嘛，告诉我嘛，方便我去小窗讨伐你</p>
+      <div class="confirm-row">
+        <button class="btn btn-primary btn-block" id="btnStartWithName">带着昵称，开始测试</button>
+      </div>
+    </div>
+
+    <!-- Screen 2: warning after clicking 就不告诉你 -->
+    <div class="screen" id="screen-warning">
+      <div class="warning-box">
+        <p>如果你是出于好奇点开这个链接，那你就狠心跳过吧。</p>
+        <p class="angry">如果你是被我胁迫填这个测试的，你敢不留昵称，我就在心里扎你小人。</p>
+      </div>
+      <div class="final-choice" id="finalChoice" style="display:none;">
+        <button class="btn btn-block" id="btnReallySkip">我的名字是世界瞒着你最大的事情</button>
+        <button class="btn btn-primary btn-block" id="btnGoBackToName">我的名字是 dalala___</button>
+      </div>
+    </div>
+
+    <!-- Screen 3: quiz -->
+    <div class="screen" id="screen-quiz">
+      <div class="progress-wrap">
+        <div class="progress-top">
+          <span id="progressLabel">第 1 / 40 题</span>
+        </div>
+        <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:2.5%;"></div></div>
+      </div>
+      <div id="multiTag" class="q-multi-tag" style="display:none;">这题选哪个都对，随便选</div>
+      <div class="q-text" id="qText"></div>
+      <div class="options" id="qOptions"></div>
+      <div class="nav-row">
+        <button class="btn btn-primary" id="btnNext" disabled>下一题</button>
+      </div>
+    </div>
+
+    <!-- Screen 4: result -->
+    <div class="screen" id="screen-result">
+      <div class="result-score">
+        <span class="num" id="scoreNum">0</span>
+        <span class="out-of"> / 40 分</span>
+      </div>
+      <div class="tier-title" id="tierTitle"></div>
+      <div class="tier-desc" id="tierDesc"></div>
+      <div class="result-actions">
+        <button class="btn" style="flex:1;" id="btnRetry">让我再蒙一次吧</button>
+        <button class="btn btn-primary" style="flex:1;" id="btnSubmitBoard">上榜留名</button>
+      </div>
+
+      <hr class="divider">
+      <div class="board-title">对某道题有疑虑？解释都在这里哦</div>
+      <div class="board-sub">输入题号（1-40），看看昭矛线怎么说</div>
+      <div class="name-row" style="margin-bottom:10px;">
+        <input type="number" id="explainInput" min="1" max="40" placeholder="题号，比如 6">
+        <button class="btn" id="btnExplain">查看解释</button>
+      </div>
+      <div id="explainResult" style="display:none; border:2px solid var(--ink); padding:12px 14px; margin-bottom:22px;">
+        <div id="explainQ" style="font-weight:900; font-size:14px; margin-bottom:6px;"></div>
+        <div id="explainText" style="font-size:14px; line-height:1.8; color:var(--ink-soft); white-space:pre-line;"></div>
+      </div>
+
+      <hr class="divider">
+      <div class="board-title">交心排行榜</div>
+      <div class="board-sub">昵称与分数会公开显示，慎重填写</div>
+      <ul class="board-list" id="boardList">
+        <li class="board-loading">排行榜加载中...</li>
+      </ul>
+      <div class="footer-note" id="configNote" style="display:none;">
+        排行榜还没配置好——打开这个文件，把 KVDB_BUCKET_ID 换成你自己的 bucket ID 就能用了（说明写在文件最上面）。
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+(function(){
+
+  // ---------- config ----------
+  var KVDB_BUCKET_ID = "PASTE_YOUR_BUCKET_ID_HERE";
+  var KVDB_BASE = "https://kvdb.io/" + KVDB_BUCKET_ID;
+  var KEY_PREFIX = "lb-";
+  var boardConfigured = KVDB_BUCKET_ID.indexOf("PASTE_YOUR") === -1;
+
+  // ---------- data ----------
+  var QUESTIONS = [
+    {q:"以下哪位是我的梦角哥", o:["温迪","谢回","源稚生","叶问舟"], c:2},
+    {q:"我妹妹的小名是什么？", o:["大香山","二秃子","妞妞","Susan"], c:1},
+    {q:"我对于同担/同价的态度", o:["不管三七二十一通通发卖","只要不贴脸就当不存在","异父异母的家人","同担是什么可以吃吗"], c:2},
+    {q:"我最爱的MBTI是什么", o:["小蝴蝶","大剑哥","绿老头","快乐小狗"], c:0},
+    {q:"我喜欢以下哪种甜品", o:["蛋挞","巴斯克","巧克力","曲奇"], c:1},
+    {q:"以下哪个称呼是我曾经很讨厌别人这样叫我，但后来经常自称/当做昵称的", o:["昭昭","小予","阿予","矛线"], c:0},
+    {q:"我最讨厌以下哪个运动员", o:["内森陈","宇野昌磨","键山优真","马琳琳"], c:0},
+    {q:"我对哪类视觉内容可能产生明显不适/恐惧？", o:["黑白漫画","静态风景照","写实、立体、动态的龙类形象","卡通动物"], c:2},
+    {q:"你觉得我是确实型人格还是反驳型人格", o:["确实型人格","反驳型人格","确实反驳型人格","薛定谔的确实反驳型人格"], c:3},
+    {q:"我最爱的AI大模型是什么", o:["GPT","GPT4","GPT4o","GPT5"], c:2},
+    {q:"以下哪种是我最爱的XP", o:["病弱养胃男","白切黑切白","傲娇小正太","黑皮男妈妈"], c:0},
+    {q:"我最初是被王源的哪种特质吸引的", o:["清冷","温柔","傲娇","活泼"], c:0},
+    {q:"我最讨厌的颜色", o:["白色","红色","黑色","紫色"], c:1},
+    {q:"我最念念不忘的一部剧/电影", o:["去他妈的世界","一念天堂","泰版流星花园","IT狂人"], c:0},
+    {q:"我最想去哪家公司工作", o:["冈易","TME","祖龙","抖音"], c:0},
+    {q:"我对代入党的态度", o:["不嘴我女我根本就不在意","有多远滚多远","乙游怎样都随意","我就是代入党呀"], c:0},
+    {q:"林俊杰的哪首歌对我来说有最特殊的意义", o:["愿与愁","生生","不为谁而作的歌","她说"], c:3},
+    {q:"我最喜欢的mentor是谁", o:["菠菠老师","R老师","小L学姐","my姐"], c:2},
+    {q:"以下哪位是我欧美圈的前夫", o:["Justin Bieber","Troye Sivan","Alex Lawther","Greyson Chance"], c:3},
+    {q:"以下哪位是我内娱的前夫", o:["王俊凯","杨洋","吴磊","刘宇"], c:3},
+    {q:"李飞和黄锐打起来了我怎么办", o:["打死一个少一个","两个苟延残喘的人还有打架的余力？","支持黄锐锤爆李飞","别想了，不存在偏向李飞的选项"], c:2},
+    {q:"我最喜欢的文人是谁", o:["李清照","辛弃疾","柳永","晏殊"], c:2},
+    {q:"我童年时期最最最喜欢的历史人物是谁", o:["周瑜","孙尚香","赵云","孙策"], c:1},
+    {q:"我聊天的时候出现频率最高的词是", o:["哈哈哈（别管几个哈了）","我也觉得","笑死我了","哦哦哦"], c:0},
+    {q:"谁是我心目中的师兄No.1（都很好，只是我个人偏爱）", o:["楚子航","祢衡","叶问舟","曲正风"], c:2},
+    {q:"我小时候最喜欢的动画片是什么", o:["喜羊羊与灰太狼","洛洛历险记","超兽武装","哈皮父子"], c:2},
+    {q:"我小时候最喜欢的游戏是什么", o:["龙斗士","神将世界","多洛战纪","奥拉星"], c:0},
+    {q:"哪个MBTI更容易和我成为朋友", o:["紫老头","小画家","小蝴蝶","大剑哥"], c:2},
+    {q:"我最喜欢什么水果", o:["榴莲","菠萝蜜","小西红柿","石榴"], c:2},
+    {q:"完全不考虑现实的话，我最想成为什么", o:["诗人","物理学家","律师","医生"], c:1},
+    {q:"我最讨厌谁（生物学上的）", o:["表哥","表姐","表弟","表妹"], c:2},
+    {q:"之前入职冈易的时候我最想私联（在办公软件上骚扰）的人是谁", o:["丁磊","Lily","木儿","叶弄舟"], c:2},
+    {q:"我喜欢一个人的态度是", o:["全肯定","辱骂式追星","嬷ta嬷ta","淡淡的就好"], c:0},
+    {q:"为什么我嗑CP从来不肯给家产一个名分", o:["我一直是梦嗑etj","偷吃的饭总是最香","wpg所以不领粉籍","顶多偶尔嗑几嘴"], c:0, multi:true},
+    {q:"我最喜欢的作家", o:["江南","夜北","小禾棠","边鹿"], c:1},
+    {q:"以下哪件事情我没做过", o:["高中在主任门缝塞举报信","在广播站门口粘纸条点歌","骑电驴的时候倒在了粪坑上","在客厅走着走着把自己平地甩飞了"], c:2},
+    {q:"我微博关注的第一个人", o:["王源","刘志宏","夜北大将军","黄锐"], c:2},
+    {q:"如果可以的话，我最希望把哪项天赋点满", o:["唱歌","画画","写作","摄影"], c:2},
+    {q:"我经常用哪个软件听歌", o:["网易云","酷狗","Q音","Spotify"], c:1},
+    {q:"最近我在看我朋友推荐的哪本书", o:["上海堡垒","九州刹那公子","但为君故","龙王世界的重启"], c:0}
+  ];
+
+  var TIERS = [
+    {min:0,  max:8,  title:"陌生的天使女孩",
+      desc:"谢谢你来做我的测试～不管我们in不ins只要你做了我的测试并且没有对此嗤之以鼻我们就是好朋友，当然如果你是被我按头来做题的我会刊丝你哦"},
+    {min:9,  max:16, title:"我们是点点点头之交吗",
+      desc:"以我题目的难度来说，好像能答对这些已经非常不容易了，谢谢你来做我的题还答对了这么多，你也太棒了吧"},
+    {min:17, max:24, title:"你是我大眼珠子互关吧",
+      desc:"要么我和你有绿泡泡1个G以上的聊天记录要么我们是互关，又或者你真的用心看了我每一条发疯的朋友圈？否则我想不通你怎么能答对这么多题的"},
+    {min:25, max:31, title:"你在我huq住下了吧", desc:""},
+    {min:32, max:40, title:"这昭矛线您来做吧", desc:""}
+  ];
+
+  var EXPLANATIONS = [
+    "虽然同样非常之喜欢另外三位，但我确实只对源稚生有梦女的倾向",
+    "没办法，谁让我妈就是这么嘴毒",
+    "同担姐，有你们我好幸福，幸福幸福请降临我们手心",
+    "就是爱小蝴蝶呀，其次大剑，其实我是绿人全肯定选项里的我都爱",
+    "爱吃什么还用解释吗",
+    "大概是因为之前各个平台都叫昭昭小阿予，别人喊我前两个字会有一种被点名的激灵感，所以从前说过讨厌被叫昭昭，直到23年入坑了逆手，逆水寒里的昵称就是昭昭，不仅不反感了，cn也变成昭昭了",
+    "竞籍体育的嚼嚼者",
+    "已经被吓出过心理阴影了，但凡写实一点的龙我都非常恐惧",
+    "这个很明显了吧",
+    "呜呜呜呜奥特曼我恨你",
+    "喜欢养胃男被你发现，大概是因为代号鸢的张邈开始喜欢病弱西子剩三分、有淡淡羊尾感的男人的吧",
+    "我将用最直接最直白最客观最真实最简略最不绕弯子最一针见血的方式告诉你，早期的王源是清冷感的神",
+    "天生就很讨厌红色，但又因为绘梨衣爱上了红色（但仍然讨厌和绘梨衣无关的红色）",
+    "追得我哭死了好吧",
+    "冈易虐我千百遍，我待冈易如初恋",
+    "如果不是她们被我女克死了到底谁在意她们……",
+    "我是因为王源翻唱的《她说》入坑的呀",
+    "这有啥好解释的，我不是逢人就见缝插针的炫耀我有一个特别好的学姐嘛～这题答不对打死你们",
+    "呜呜呜",
+    "他好娇我好爱",
+    "不解释，但是我觉得B也挺好的",
+    "有不明显的风险吗？",
+    "我直接在天天在电脑上搜索和她有关的一切，看/玩了几乎所有 有她出现的影视剧、动画片、游戏好吧，现在依然喜欢每个ip的香香",
+    "加起来有一万多次（当然我把我朋友发的哈也算上了不然数不过来）",
+    "橙子花是狸猫肥的师兄，祢衡是小广的猴猴师兄，曲正风是整个崖山的大师兄，而叶问舟更像我的师兄，而且叶问舟是一个特别温柔美好到有些失真的角色呀",
+    "看了有十遍了吧",
+    "有种淡淡的温馨感",
+    "我和小蝴蝶就是血脉相吸",
+    "爱吃什么还用解释吗",
+    "我物理巅峰水平是7分哦，“完全”不考虑现实是想成为物理学家，考虑一点现实是律师，如果当年分数够了，也许我现在已经成为律师了？（即使社恐）",
+    "不需要解释了。",
+    "是创造出叶问舟这个角色的作家哦～是我师兄的妈妈",
+    "不解释，但是小克你咋自作主张把我的辱追改成辱骂式追星了",
+    "都多选了解释啥。",
+    "我爱她也恨她，为什么要抄袭呢。",
+    "没啥可解释的。",
+    "当年的心情就是好喜欢她的作品想追随她，那时候哪里会玩什么微博呢。。",
+    "出题的时候也在犹豫答案是画画还是写作，因为我觉得画画更能含蓄表达自己的灵魂，能否被读懂看缘分，写作相比来说更直白一些，但是想了想画画除了天赋也需要努力，而文字的天赋更多是信手拈来吧",
+    "不用解释呀。",
+    "就五百多页看一半不想看了哈哈"
+  ];
+
+  function getTier(score){
+    for(var i=0;i<TIERS.length;i++){
+      if(score>=TIERS[i].min && score<=TIERS[i].max) return TIERS[i];
+    }
+    return TIERS[0];
+  }
+
+  // ---------- state ----------
+  var state = { nickname:"", current:0, answered:[], correctCount:0 };
+
+  function show(id){
+    document.querySelectorAll(".screen").forEach(function(el){ el.classList.remove("active"); });
+    document.getElementById(id).classList.add("active");
+  }
+
+  // ---------- nickname flow ----------
+  var nicknameInput = document.getElementById("nicknameInput");
+
+  var nameErrorEl = document.getElementById("nameError");
+
+  document.getElementById("btnStartWithName").addEventListener("click", function(){
+    var val = nicknameInput.value.trim();
+    if(!val){
+      nameErrorEl.style.display = "block";
+      nicknameInput.focus();
+      return;
+    }
+    nameErrorEl.style.display = "none";
+    state.nickname = val;
+    startQuiz();
+  });
+
+  nicknameInput.addEventListener("input", function(){
+    if(nicknameInput.value.trim()) nameErrorEl.style.display = "none";
+  });
+
+  document.getElementById("btnSkipToWarning").addEventListener("click", function(){
+    show("screen-warning");
+    document.getElementById("finalChoice").style.display = "none";
+    setTimeout(function(){
+      document.getElementById("finalChoice").style.display = "flex";
+    }, 1600);
+  });
+
+  document.getElementById("btnReallySkip").addEventListener("click", function(){
+    state.nickname = "世界瞒着你最大的事情";
+    startQuiz();
+  });
+
+  document.getElementById("btnGoBackToName").addEventListener("click", function(){
+    show("screen-nickname");
+    nicknameInput.focus();
+  });
+
+  // ---------- quiz flow ----------
+  var qTextEl = document.getElementById("qText");
+  var qOptionsEl = document.getElementById("qOptions");
+  var btnNext = document.getElementById("btnNext");
+  var progressLabel = document.getElementById("progressLabel");
+  var progressFill = document.getElementById("progressFill");
+  var multiTag = document.getElementById("multiTag");
+
+  function startQuiz(){
+    state.current = 0;
+    state.answered = new Array(QUESTIONS.length).fill(null);
+    state.correctCount = 0;
+    show("screen-quiz");
+    renderQuestion();
+  }
+
+  function renderQuestion(){
+    var idx = state.current;
+    var item = QUESTIONS[idx];
+    progressLabel.textContent = "第 " + (idx+1) + " / " + QUESTIONS.length + " 题";
+    progressFill.style.width = (((idx+1)/QUESTIONS.length)*100) + "%";
+    multiTag.style.display = item.multi ? "inline-block" : "none";
+    qTextEl.textContent = item.q;
+    qOptionsEl.innerHTML = "";
+    btnNext.disabled = true;
+    btnNext.textContent = (idx === QUESTIONS.length-1) ? "查看结果" : "下一题";
+
+    var letters = ["A","B","C","D"];
+    item.o.forEach(function(optText, optIdx){
+      var btn = document.createElement("button");
+      btn.className = "option";
+      btn.innerHTML = '<span class="tag">'+letters[optIdx]+'</span><span>'+optText+'</span>';
+      btn.addEventListener("click", function(){ chooseOption(optIdx); });
+      qOptionsEl.appendChild(btn);
+    });
+  }
+
+  function chooseOption(optIdx){
+    state.answered[state.current] = optIdx;
+
+    var optionEls = qOptionsEl.querySelectorAll(".option");
+    optionEls.forEach(function(el, i){
+      el.classList.toggle("selected", i === optIdx);
+    });
+
+    btnNext.disabled = false;
+  }
+
+  btnNext.addEventListener("click", function(){
+    if(state.current < QUESTIONS.length - 1){
+      state.current++;
+      renderQuestion();
+    } else {
+      finishQuiz();
+    }
+  });
+
+  // ---------- result ----------
+  var scoreNumEl = document.getElementById("scoreNum");
+  var tierTitleEl = document.getElementById("tierTitle");
+  var tierDescEl = document.getElementById("tierDesc");
+  var boardSubmitted = false;
+
+  function computeScore(){
+    var score = 0;
+    for(var i=0;i<QUESTIONS.length;i++){
+      var ans = state.answered[i];
+      if(ans === null) continue;
+      var item = QUESTIONS[i];
+      if(item.multi || ans === item.c) score++;
+    }
+    return score;
+  }
+
+  function finishQuiz(){
+    var score = computeScore();
+    state.correctCount = score;
+    var tier = getTier(score);
+    scoreNumEl.textContent = score;
+    tierTitleEl.textContent = tier.title;
+    if(tier.desc){
+      tierDescEl.textContent = tier.desc;
+      tierDescEl.classList.remove("empty");
+    } else {
+      tierDescEl.textContent = "";
+      tierDescEl.classList.add("empty");
+    }
+    boardSubmitted = false;
+    var submitBtn = document.getElementById("btnSubmitBoard");
+    submitBtn.disabled = false;
+    submitBtn.textContent = "上榜留名";
+    document.getElementById("configNote").style.display = boardConfigured ? "none" : "block";
+    document.getElementById("explainResult").style.display = "none";
+    document.getElementById("explainInput").value = "";
+    show("screen-result");
+    loadBoard();
+  }
+
+  document.getElementById("btnRetry").addEventListener("click", function(){
+    nicknameInput.value = "";
+    nameErrorEl.style.display = "none";
+    show("screen-nickname");
+    nicknameInput.focus();
+  });
+
+  // ---------- explanation lookup ----------
+  var explainInput = document.getElementById("explainInput");
+  var explainResult = document.getElementById("explainResult");
+  var explainQ = document.getElementById("explainQ");
+  var explainText = document.getElementById("explainText");
+
+  document.getElementById("btnExplain").addEventListener("click", function(){
+    var n = parseInt(explainInput.value, 10);
+    if(!n || n < 1 || n > QUESTIONS.length){
+      explainResult.style.display = "block";
+      explainQ.textContent = "";
+      explainText.textContent = "填个 1 到 " + QUESTIONS.length + " 之间的题号叭";
+      return;
+    }
+    explainQ.textContent = "第 " + n + " 题：" + QUESTIONS[n-1].q;
+    explainText.textContent = EXPLANATIONS[n-1];
+    explainResult.style.display = "block";
+  });
+
+  // ---------- leaderboard (kvdb.io, works on any static host) ----------
+  var boardListEl = document.getElementById("boardList");
+
+  async function loadBoard(){
+    if(!boardConfigured){
+      boardListEl.innerHTML = '<li class="board-empty">排行榜还没配置好，见下方提示</li>';
+      return;
+    }
+    boardListEl.innerHTML = '<li class="board-loading">排行榜加载中...</li>';
+    try{
+      var listResp = await fetch(KVDB_BASE + "/?prefix=" + KEY_PREFIX);
+      if(!listResp.ok) throw new Error("list failed");
+      var listText = await listResp.text();
+      var keys = listText.split("\n").map(function(k){ return k.trim(); }).filter(Boolean);
+      if(keys.length === 0){
+        boardListEl.innerHTML = '<li class="board-empty">还没有人上榜，你可以成为第一个</li>';
+        return;
+      }
+      keys = keys.slice(-100); // cap how many we fetch
+      var entries = [];
+      await Promise.all(keys.map(async function(key){
+        try{
+          var r = await fetch(KVDB_BASE + "/" + key);
+          if(!r.ok) return;
+          var txt = await r.text();
+          var parsed = JSON.parse(txt);
+          entries.push(parsed);
+        }catch(e){ /* skip bad entry */ }
+      }));
+      entries.sort(function(a,b){ return b.score - a.score || b.ts - a.ts; });
+      entries = entries.slice(0, 20);
+      if(entries.length === 0){
+        boardListEl.innerHTML = '<li class="board-empty">还没有人上榜，你可以成为第一个</li>';
+        return;
+      }
+      boardListEl.innerHTML = "";
+      entries.forEach(function(e, i){
+        var li = document.createElement("li");
+        li.className = "board-row" + (e.nickname === state.nickname && e.score === state.correctCount ? " me" : "");
+        li.innerHTML = '<span class="rank">'+(i+1)+'</span><span class="name">'+escapeHtml(e.nickname)+'</span><span class="score">'+e.score+' 分</span>';
+        boardListEl.appendChild(li);
+      });
+    }catch(err){
+      boardListEl.innerHTML = '<li class="board-empty">排行榜暂时加载不出来，晚点再试试</li>';
+    }
+  }
+
+  function escapeHtml(str){
+    var div = document.createElement("div");
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  document.getElementById("btnSubmitBoard").addEventListener("click", async function(){
+    if(boardSubmitted) return;
+    var btn = this;
+    if(!boardConfigured){
+      document.getElementById("configNote").style.display = "block";
+      return;
+    }
+    btn.disabled = true;
+    btn.textContent = "上榜中...";
+    try{
+      var key = KEY_PREFIX + Date.now() + "-" + Math.floor(Math.random()*100000);
+      var value = JSON.stringify({ nickname: state.nickname, score: state.correctCount, ts: Date.now() });
+      var res = await fetch(KVDB_BASE + "/" + key, { method:"POST", body:value });
+      if(res.ok){
+        boardSubmitted = true;
+        btn.textContent = "已上榜";
+        loadBoard();
+      } else {
+        btn.disabled = false;
+        btn.textContent = "上榜失败，再试一次";
+      }
+    }catch(err){
+      btn.disabled = false;
+      btn.textContent = "上榜失败，再试一次";
+    }
+  });
+
+})();
+</script>
+</body>
+</html>
