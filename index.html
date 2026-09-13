@@ -304,7 +304,7 @@
 (function(){
 
   // ---------- config ----------
-  var KVDB_BUCKET_ID = "3qxG8LmRwFJNnbXUbuHSpd";
+  var KVDB_BUCKET_ID = "PASTE_YOUR_BUCKET_ID_HERE";
   var KVDB_BASE = "https://kvdb.io/" + KVDB_BUCKET_ID;
   var KEY_PREFIX = "lb-";
   var boardConfigured = KVDB_BUCKET_ID.indexOf("PASTE_YOUR") === -1;
@@ -657,11 +657,12 @@
         loadBoard();
       } else {
         btn.disabled = false;
-        btn.textContent = "上榜失败，再试一次";
+        btn.textContent = "上榜失败（状态码 " + res.status + "，再试一次）";
       }
     }catch(err){
       btn.disabled = false;
-      btn.textContent = "上榜失败，再试一次";
+      btn.textContent = "上榜失败（网络/跨域被拦，再试一次）";
+      console.error("kvdb submit error:", err);
     }
   });
 
