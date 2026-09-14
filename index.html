@@ -15,7 +15,7 @@
      ============================================================ -->
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js";
-  import { getDatabase, ref, push, query, orderByChild, limitToLast, get }
+  import { getDatabase, ref, push, get }
     from "https://www.gstatic.com/firebasejs/12.19.0/firebase-database.js";
 
   const firebaseConfig = {
@@ -41,14 +41,16 @@
 
   window.loadLeaderboardEntries = async function(){
     const entriesRef = ref(db, "leaderboard");
-    const q = query(entriesRef, orderByChild("score"), limitToLast(100));
-    const snap = await get(q);
+    const snap = await get(entriesRef);
     var list = [];
     snap.forEach(function(child){
-      list.push(child.val());
+      var item = child.val();
+      if(item && typeof item.score === "number"){
+        list.push(item);
+      }
     });
     list.sort(function(a, b){ return b.score - a.score || b.ts - a.ts; });
-    return list.slice(0, 20);
+    return list.slice(0, 25);
   };
 </script>
 
@@ -498,7 +500,8 @@
   });
 
   document.getElementById("btnReallySkip").addEventListener("click", function(){
-    state.nickname = "世界瞒着你最大的事情";
+    // 这是“跳过昵称”选项，不是一个真实昵称；上榜时显示为“匿名”。
+    state.nickname = "";
     startQuiz();
   });
 
@@ -695,8 +698,10 @@
       boardListEl.innerHTML = "";
       entries.forEach(function(e, i){
         var li = document.createElement("li");
-        li.className = "board-row" + (e.nickname === state.nickname && e.score === state.correctCount ? " me" : "");
-        li.innerHTML = '<span class="rank">'+(i+1)+'</span><span class="name">'+escapeHtml(e.nickname)+'</span><span class="score">'+e.score+' 分</span>';
+        var displayName = (e.nickname && String(e.nickname).trim()) ? String(e.nickname).trim() : "匿名";
+        var sameEntryName = state.nickname ? displayName === state.nickname : displayName === "匿名";
+        li.className = "board-row" + (sameEntryName && e.score === state.correctCount ? " me" : "");
+        li.innerHTML = '<span class="rank">'+(i+1)+'</span><span class="name">'+escapeHtml(displayName)+'</span><span class="score">'+e.score+' 分</span>';
         boardListEl.appendChild(li);
       });
     }catch(err){
@@ -728,7 +733,7 @@
     btn.disabled = true;
     btn.textContent = "上榜中...";
     try{
-      await window.submitLeaderboardEntry(state.nickname, state.correctCount);
+      await window.submitLeaderboardEntry(state.nickname || "匿名", state.correctCount);
       boardSubmitted = true;
       btn.textContent = "已上榜";
       loadBoard();
@@ -744,4 +749,4 @@
 })();
 </script>
 </body>
-</html>
+     </html>
