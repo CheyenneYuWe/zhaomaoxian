@@ -705,4 +705,419 @@
       btn.className = "option";
       btn.innerHTML = '<span class="tag">'+letters[optIdx]+'</span><span>'+optText+'</span>';
       btn.addEventListener("click", function(){ chooseOption(optIdx); });
-    
+     qOptionsEl.appendChild(btn);
+    });
+
+    // restore a previously chosen answer for this question, if any
+    var prevAns = state.answered[idx];
+    var optionEls = qOptionsEl.querySelectorAll(".option");
+    var hasAnswer = item.multi ? (Array.isArray(prevAns) && prevAns.length > 0) : (prevAns !== null);
+    if(hasAnswer){
+      optionEls.forEach(function(el, i){
+        var isSelected = item.multi ? prevAns.indexOf(i) !== -1 : i === prevAns;
+        el.classList.toggle("selected", isSelected);
+      });
+    }
+    btnNext.disabled = !hasAnswer;
+    btnNext.textContent = (idx === QUESTIONS.length-1) ? "查看结果" : "下一题";
+  }
+
+  function chooseOption(optIdx){
+    var item = QUESTIONS[state.current];
+    var optionEls = qOptionsEl.querySelectorAll(".option");
+
+    if(item.multi){
+      var picked = state.answered[state.current];
+      if(!Array.isArray(picked)) picked = [];
+      var pos = picked.indexOf(optIdx);
+      if(pos === -1) picked.push(optIdx); else picked.splice(pos, 1);
+      state.answered[state.current] = picked;
+      optionEls.forEach(function(el, i){
+        el.classList.toggle("selected", picked.indexOf(i) !== -1);
+      });
+      btnNext.disabled = picked.length === 0;
+    } else {
+      state.answered[state.current] = optIdx;
+      optionEls.forEach(function(el, i){
+        el.classList.toggle("selected", i === optIdx);
+      });
+      btnNext.disabled = false;
+    }
+  }
+
+  function renderCommentItems(listEl, comments){
+    if(!comments || comments.length === 0){
+      listEl.innerHTML = '<div class="comment-empty">还没有批注，你来留下第一条？</div>';
+      return;
+    }
+    listEl.innerHTML = "";
+    comments.forEach(function(c){
+      var item = document.createElement("div");
+      item.className = "comment-item";
+      var details = document.createElement("details");
+      var summary = document.createElement("summary");
+      var name = document.createElement("span");
+      name.textContent = (c.nickname && String(c.nickname).trim()) ? String(c.nickname).trim() : "匿名";
+      var time = document.createElement("span");
+      time.className = "comment-time";
+      time.textContent = formatCommentTime(c.ts);
+      summary.appendChild(name);
+      summary.appendChild(time);
+      var body = document.createElement("div");
+      body.className = "comment-body";
+      body.textContent = c.text;
+      details.appendChild(summary);
+      details.appendChild(body);
+      item.appendChild(details);
+      listEl.appendChild(item);
+    });
+  }
+
+  async function loadQuizComments(){
+    if(!quizCommentQuestion) return;
+    quizCommentList.innerHTML = '<div class="comment-empty">批注加载中...</div>';
+    if(typeof window.loadQuestionComments !== "function"){
+      quizCommentList.innerHTML = '<div class="comment-empty">批注功能正在初始化，请稍等重试</div>';
+      return;
+    }
+    try{
+      var comments = await window.loadQuestionComments(quizCommentQuestion);
+      renderCommentItems(quizCommentList, comments);
+    }catch(err){
+      quizCommentList.innerHTML = '<div class="comment-empty">批注暂时加载不出来，晚点再试试</div>';
+      console.error("quiz comment load error:", err);
+    }
+  }
+
+  btnQuizComments.addEventListener("click", function(){
+    var opening = !quizCommentBox.classList.contains("open");
+    quizCommentBox.classList.toggle("open", opening);
+    btnQuizComments.textContent = opening ? "💬 收起本题批注" : "💬 查看 / 写本题批注";
+    if(opening) loadQuizComments();
+  });
+
+  btnQuizSubmitComment.addEventListener("click", async function(){
+    var text = quizCommentInput.value.trim();
+    quizCommentError.style.display = "none";
+    if(!quizCommentQuestion){
+      quizCommentError.textContent = "暂时没有识别到当前题目，请重试";
+      quizCommentError.style.display = "block";
+      return;
+    }
+    if(!text){
+      quizCommentError.textContent = "批注不能为空哦";
+      quizCommentError.style.display = "block";
+      quizCommentInput.focus();
+      return;
+    }
+    if(typeof window.submitQuestionComment !== "function"){
+      quizCommentError.textContent = "批注功能正在初始化，请稍等再试";
+      quizCommentError.style.display = "block";
+      return;
+    }
+    btnQuizSubmitComment.disabled = true;
+    btnQuizSubmitComment.textContent = "发布中...";
+    try{
+      await window.submitQuestionComment(quizCommentQuestion, state.nickname || "匿名", text);
+      quizCommentInput.value = "";
+      await loadQuizComments();
+    }catch(err){
+      quizCommentError.textContent = "发布失败，再试一次";
+      quizCommentError.style.display = "block";
+      console.error("quiz comment submit error:", err);
+    }finally{
+      btnQuizSubmitComment.disabled = false;
+      btnQuizSubmitComment.textContent = "发布批注";
+    }
+  });
+
+  btnNext.addEventListener("click", function(){
+    if(state.current < QUESTIONS.length - 1){
+      state.current++;
+      renderQuestion();
+    } else {
+      finishQuiz();
+    }
+  });
+
+  btnPrev.addEventListener("click", function(){
+    if(state.current > 0){
+      state.current--;
+      renderQuestion();
+    }
+  });
+
+  // ---------- result ----------
+  var scoreNumEl = document.getElementById("scoreNum");
+  var tierTitleEl = document.getElementById("tierTitle");
+  var tierDescEl = document.getElementById("tierDesc");
+  var boardSubmitted = false;
+
+  function computeScore(){
+    var score = 0;
+    for(var i=0;i<QUESTIONS.length;i++){
+      var ans = state.answered[i];
+      var item = QUESTIONS[i];
+      if(item.multi){
+        var correctSet = Array.isArray(item.c) ? item.c.slice().sort() : [];
+        var answerSet = Array.isArray(ans) ? ans.slice().sort() : [];
+        if(correctSet.length === answerSet.length && correctSet.every(function(v, idx){ return v === answerSet[idx]; })) score++;
+      } else {
+        if(ans !== null && ans === item.c) score++;
+      }
+    }
+    return score;
+  }
+
+  function finishQuiz(){
+    var score = computeScore();
+    state.correctCount = score;
+    var tier = getTier(score);
+    scoreNumEl.textContent = score;
+    tierTitleEl.textContent = tier.title;
+    if(tier.desc){
+      tierDescEl.textContent = tier.desc;
+      tierDescEl.classList.remove("empty");
+    } else {
+      tierDescEl.textContent = "";
+      tierDescEl.classList.add("empty");
+    }
+    boardSubmitted = false;
+    var submitBtn = document.getElementById("btnSubmitBoard");
+    submitBtn.disabled = false;
+    submitBtn.textContent = "上榜留名";
+    document.getElementById("boardSubmitError").style.display = "none";
+    document.getElementById("configNote").style.display = boardConfigured ? "none" : "block";
+    document.getElementById("explainResult").style.display = "none";
+    document.getElementById("commentBox").style.display = "none";
+    document.getElementById("commentInput").value = "";
+    currentCommentQuestion = null;
+    document.getElementById("explainInput").value = "";
+    show("screen-result");
+    loadBoard();
+  }
+
+  document.getElementById("btnRetry").addEventListener("click", function(){
+    nicknameInput.value = "";
+    nameErrorEl.style.display = "none";
+    show("screen-nickname");
+    nicknameInput.focus();
+  });
+
+  // ---------- explanation lookup ----------
+  var explainInput = document.getElementById("explainInput");
+  var explainResult = document.getElementById("explainResult");
+  var explainQ = document.getElementById("explainQ");
+  var explainAnswer = document.getElementById("explainAnswer");
+  var explainText = document.getElementById("explainText");
+  var LETTERS = ["A","B","C","D"];
+
+  document.getElementById("btnExplain").addEventListener("click", function(){
+    var n = parseInt(explainInput.value, 10);
+    if(!n || n < 1 || n > QUESTIONS.length){
+      commentBox.style.display = "none";
+      currentCommentQuestion = null;
+      explainResult.style.display = "block";
+      explainQ.textContent = "";
+      explainAnswer.textContent = "";
+      explainText.textContent = "填个 1 到 " + QUESTIONS.length + " 之间的题号叭";
+      return;
+    }
+    var item = QUESTIONS[n-1];
+    explainQ.textContent = "第 " + n + " 题：" + item.q;
+    if(item.multi){
+      if(Array.isArray(item.c)){
+        explainAnswer.textContent = "正确答案：" + item.c.map(function(i){ return LETTERS[i]; }).join("、");
+      }else{
+        explainAnswer.textContent = "本题多选，选哪个都算对";
+      }
+    }else{
+      explainAnswer.textContent = LETTERS[item.c] + ". " + item.o[item.c];
+    }
+    explainText.textContent = EXPLANATIONS[n-1];
+    explainResult.style.display = "block";
+  });
+
+  // ---------- question comments ----------
+  var commentBox = document.getElementById("commentBox");
+  var commentTitle = document.getElementById("commentTitle");
+  var commentInput = document.getElementById("commentInput");
+  var commentAuthor = document.getElementById("commentAuthor");
+  var commentError = document.getElementById("commentError");
+  var commentList = document.getElementById("commentList");
+  var btnSubmitComment = document.getElementById("btnSubmitComment");
+  var currentCommentQuestion = null;
+
+  function formatCommentTime(ts){
+    if(!ts) return "时间未知";
+    var d = new Date(ts);
+    var pad = function(n){ return String(n).padStart(2, "0"); };
+    return d.getFullYear() + "/" + pad(d.getMonth()+1) + "/" + pad(d.getDate()) + " " + pad(d.getHours()) + ":" + pad(d.getMinutes());
+  }
+
+  async function loadCommentsForQuestion(n){
+    currentCommentQuestion = n;
+    commentTitle.textContent = "第 " + n + " 题的批注";
+    commentAuthor.textContent = state.nickname ? "以“" + state.nickname + "”的昵称发布" : "以匿名身份发布";
+    commentError.style.display = "none";
+    commentList.innerHTML = '<div class="comment-empty">批注加载中...</div>';
+    commentBox.style.display = "block";
+    if(typeof window.loadQuestionComments !== "function"){
+      commentList.innerHTML = '<div class="comment-empty">批注功能正在初始化，请稍等重试</div>';
+      return;
+    }
+    try{
+      var comments = await window.loadQuestionComments(n);
+      if(!comments || comments.length === 0){
+        commentList.innerHTML = '<div class="comment-empty">还没有批注，你来留下第一条？</div>';
+        return;
+      }
+      commentList.innerHTML = "";
+      comments.forEach(function(c){
+        var item = document.createElement("div");
+        item.className = "comment-item";
+        var details = document.createElement("details");
+        var summary = document.createElement("summary");
+        var name = document.createElement("span");
+        name.textContent = (c.nickname && String(c.nickname).trim()) ? String(c.nickname).trim() : "匿名";
+        var time = document.createElement("span");
+        time.className = "comment-time";
+        time.textContent = formatCommentTime(c.ts);
+        summary.appendChild(name);
+        summary.appendChild(time);
+        var body = document.createElement("div");
+        body.className = "comment-body";
+        body.textContent = c.text;
+        details.appendChild(summary);
+        details.appendChild(body);
+        item.appendChild(details);
+        commentList.appendChild(item);
+      });
+    }catch(err){
+      commentList.innerHTML = '<div class="comment-empty">批注暂时加载不出来，晚点再试试</div>';
+      console.error("comment load error:", err);
+    }
+  }
+
+  document.getElementById("btnViewComments").addEventListener("click", function(){
+    var n = parseInt(explainInput.value, 10);
+    if(!n || n < 1 || n > QUESTIONS.length){
+      commentBox.style.display = "block";
+      currentCommentQuestion = null;
+      commentTitle.textContent = "先填一个正确的题号";
+      commentList.innerHTML = '<div class="comment-empty">填个 1 到 ' + QUESTIONS.length + ' 之间的题号叭</div>';
+      commentInput.value = "";
+      return;
+    }
+    loadCommentsForQuestion(n);
+  });
+
+  btnSubmitComment.addEventListener("click", async function(){
+    var text = commentInput.value.trim();
+    commentError.style.display = "none";
+    if(!currentCommentQuestion){
+      commentError.textContent = "先输入题号并查看一下这道题叭";
+      commentError.style.display = "block";
+      return;
+    }
+    if(!text){
+      commentError.textContent = "批注不能为空哦";
+      commentError.style.display = "block";
+      commentInput.focus();
+      return;
+    }
+    if(typeof window.submitQuestionComment !== "function"){
+      commentError.textContent = "批注功能正在初始化，请稍等再试";
+      commentError.style.display = "block";
+      return;
+    }
+    btnSubmitComment.disabled = true;
+    btnSubmitComment.textContent = "发布中...";
+    try{
+      await window.submitQuestionComment(currentCommentQuestion, state.nickname || "匿名", text);
+      commentInput.value = "";
+      await loadCommentsForQuestion(currentCommentQuestion);
+    }catch(err){
+      commentError.textContent = "发布失败，再试一次";
+      commentError.style.display = "block";
+      console.error("comment submit error:", err);
+    }finally{
+      btnSubmitComment.disabled = false;
+      btnSubmitComment.textContent = "发布批注";
+    }
+  });
+
+  // ---------- leaderboard (Firebase Realtime Database, works on any static host) ----------
+  var boardListEl = document.getElementById("boardList");
+
+  async function loadBoard(){
+    if(!boardConfigured){
+      boardListEl.innerHTML = '<li class="board-empty">排行榜还没配置好，见下方提示</li>';
+      return;
+    }
+    boardListEl.innerHTML = '<li class="board-loading">排行榜加载中...</li>';
+    if(typeof window.loadLeaderboardEntries !== "function"){
+      boardListEl.innerHTML = '<li class="board-loading">排行榜正在初始化，请稍等重试</li>';
+      return;
+    }
+    try{
+      var entries = await window.loadLeaderboardEntries();
+      if(!entries || entries.length === 0){
+        boardListEl.innerHTML = '<li class="board-empty">还没有人上榜，你可以成为第一个</li>';
+        return;
+      }
+      boardListEl.innerHTML = "";
+      entries.forEach(function(e, i){
+        var li = document.createElement("li");
+        var displayName = (e.nickname && String(e.nickname).trim()) ? String(e.nickname).trim() : "匿名";
+        var sameEntryName = state.nickname ? displayName === state.nickname : displayName === "匿名";
+        li.className = "board-row" + (sameEntryName && e.score === state.correctCount ? " me" : "");
+        li.innerHTML = '<span class="rank">'+(i+1)+'</span><span class="name">'+escapeHtml(displayName)+'</span><span class="score">'+e.score+' 分</span>';
+        boardListEl.appendChild(li);
+      });
+    }catch(err){
+      boardListEl.innerHTML = '<li class="board-empty">排行榜暂时加载不出来，晚点再试试</li>';
+      console.error("leaderboard load error:", err);
+    }
+  }
+
+  function escapeHtml(str){
+    var div = document.createElement("div");
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  document.getElementById("btnSubmitBoard").addEventListener("click", async function(){
+    if(boardSubmitted) return;
+    var btn = this;
+    var errEl = document.getElementById("boardSubmitError");
+    errEl.style.display = "none";
+    if(!boardConfigured){
+      document.getElementById("configNote").style.display = "block";
+      return;
+    }
+    if(typeof window.submitLeaderboardEntry !== "function"){
+      errEl.textContent = "排行榜正在初始化，请稍等再点一次";
+      errEl.style.display = "block";
+      return;
+    }
+    btn.disabled = true;
+    btn.textContent = "上榜中...";
+    try{
+      await window.submitLeaderboardEntry(state.nickname || "匿名", state.correctCount);
+      boardSubmitted = true;
+      btn.textContent = "已上榜";
+      loadBoard();
+    }catch(err){
+      btn.disabled = false;
+      btn.textContent = "上榜留名";
+      errEl.textContent = "上榜失败，再试一次";
+      errEl.style.display = "block";
+      console.error("firebase submit error:", err);
+    }
+  });
+
+})();
+</script>
+</body>
+</html>
