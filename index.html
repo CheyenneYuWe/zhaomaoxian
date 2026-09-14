@@ -6,26 +6,53 @@
 <title>对昭矛线的了解度测试</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700;900&display=swap" rel="stylesheet">
+
+<!-- ============================================================
+     LEADERBOARD BACKEND: Firebase Realtime Database
+     Public read/write, already configured below — ready to deploy
+     as-is on GitHub Pages. Realtime Database rules for this project
+     should be set to {"rules": {".read": true, ".write": true}}.
+     ============================================================ -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js";
+  import { getDatabase, ref, push, query, orderByChild, limitToLast, get }
+    from "https://www.gstatic.com/firebasejs/12.19.0/firebase-database.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyAueQbkP-qykrYO6wh_qTzvZ5mHSsSa-SU",
+    authDomain: "zhaomaoxian-quiz.firebaseapp.com",
+    databaseURL: "https://zhaomaoxian-quiz-default-rtdb.firebaseio.com",
+    projectId: "zhaomaoxian-quiz",
+    storageBucket: "zhaomaoxian-quiz.firebasestorage.app",
+    messagingSenderId: "490725351307",
+    appId: "1:490725351307:web:e71ad8c650da1146f1d98e",
+    measurementId: "G-2M12Q4FS5K"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db = getDatabase(app);
+
+  window.__leaderboardReady = true;
+
+  window.submitLeaderboardEntry = async function(nickname, score){
+    const entriesRef = ref(db, "leaderboard");
+    await push(entriesRef, { nickname: nickname, score: score, ts: Date.now() });
+  };
+
+  window.loadLeaderboardEntries = async function(){
+    const entriesRef = ref(db, "leaderboard");
+    const q = query(entriesRef, orderByChild("score"), limitToLast(100));
+    const snap = await get(q);
+    var list = [];
+    snap.forEach(function(child){
+      list.push(child.val());
+    });
+    list.sort(function(a, b){ return b.score - a.score || b.ts - a.ts; });
+    return list.slice(0, 20);
+  };
+</script>
+
 <style>
-
-  /* ============================================================
-     LEADERBOARD BACKEND CONFIG
-     This page uses kvdb.io — a free, no-login key-value store —
-     so the leaderboard works on a plain static host like GitHub
-     Pages (no server needed).
-
-     The bucket ID below is already filled in and ready to deploy —
-     just push this file to a GitHub repo and enable GitHub Pages.
-
-     If you ever want a fresh bucket (e.g. to reset the leaderboard,
-     or start a separate one for a different quiz), run:
-          curl -d "email=you@example.com" https://kvdb.io
-     and swap the returned ID into KVDB_BUCKET_ID below.
-
-     Note: this bucket has no password — anyone who has this page's
-     source can read/write it. Fine for a casual leaderboard among
-     friends, not for anything sensitive.
-     ============================================================ */
 
   :root{
     --bg:#f6f4ee;
@@ -305,13 +332,13 @@
       </div>
 
       <hr class="divider">
-      <div class="board-title">交心排行榜</div>
-      <div class="board-sub">昵称与分数会公开显示，慎重填写</div>
+      <div class="board-title">了解度排行榜</div>
+      <div class="board-sub">我信任的、交心的、交流的、心与心的、我爱的你我还认识吗</div>
       <ul class="board-list" id="boardList">
         <li class="board-loading">排行榜加载中...</li>
       </ul>
       <div class="footer-note" id="configNote" style="display:none;">
-        排行榜还没配置好——打开这个文件，把 KVDB_BUCKET_ID 换成你自己的 bucket ID 就能用了（说明写在文件最上面）。
+        排行榜暂时用不了，麻烦稍后再试一次。
       </div>
     </div>
 
@@ -322,10 +349,7 @@
 (function(){
 
   // ---------- config ----------
-  var KVDB_BUCKET_ID = "3qxG8LmRwFJNnbXUbuHSpd";
-  var KVDB_BASE = "https://kvdb.io/" + KVDB_BUCKET_ID;
-  var KEY_PREFIX = "lb-";
-  var boardConfigured = true;
+  var boardConfigured = true; // Firebase functions are set up in the module script above
 
   // ---------- data ----------
   var QUESTIONS = [
@@ -585,7 +609,7 @@
       var ans = state.answered[i];
       var item = QUESTIONS[i];
       if(item.multi){
-        if(Array.isArray(ans) && ans.length > 0) score++;
+        if(Array.isArray(ans) && ans.length === item.o.length) score++;
       } else {
         if(ans !== null && ans === item.c) score++;
       }
@@ -649,7 +673,7 @@
     explainResult.style.display = "block";
   });
 
-  // ---------- leaderboard (kvdb.io, works on any static host) ----------
+  // ---------- leaderboard (Firebase Realtime Database, works on any static host) ----------
   var boardListEl = document.getElementById("boardList");
 
   async function loadBoard(){
@@ -658,29 +682,13 @@
       return;
     }
     boardListEl.innerHTML = '<li class="board-loading">排行榜加载中...</li>';
+    if(typeof window.loadLeaderboardEntries !== "function"){
+      boardListEl.innerHTML = '<li class="board-loading">排行榜正在初始化，请稍等重试</li>';
+      return;
+    }
     try{
-      var listResp = await fetch(KVDB_BASE + "/?prefix=" + KEY_PREFIX);
-      if(!listResp.ok) throw new Error("list failed");
-      var listText = await listResp.text();
-      var keys = listText.split("\n").map(function(k){ return k.trim(); }).filter(Boolean);
-      if(keys.length === 0){
-        boardListEl.innerHTML = '<li class="board-empty">还没有人上榜，你可以成为第一个</li>';
-        return;
-      }
-      keys = keys.slice(-100); // cap how many we fetch
-      var entries = [];
-      await Promise.all(keys.map(async function(key){
-        try{
-          var r = await fetch(KVDB_BASE + "/" + key);
-          if(!r.ok) return;
-          var txt = await r.text();
-          var parsed = JSON.parse(txt);
-          entries.push(parsed);
-        }catch(e){ /* skip bad entry */ }
-      }));
-      entries.sort(function(a,b){ return b.score - a.score || b.ts - a.ts; });
-      entries = entries.slice(0, 20);
-      if(entries.length === 0){
+      var entries = await window.loadLeaderboardEntries();
+      if(!entries || entries.length === 0){
         boardListEl.innerHTML = '<li class="board-empty">还没有人上榜，你可以成为第一个</li>';
         return;
       }
@@ -693,6 +701,7 @@
       });
     }catch(err){
       boardListEl.innerHTML = '<li class="board-empty">排行榜暂时加载不出来，晚点再试试</li>';
+      console.error("leaderboard load error:", err);
     }
   }
 
@@ -711,28 +720,24 @@
       document.getElementById("configNote").style.display = "block";
       return;
     }
+    if(typeof window.submitLeaderboardEntry !== "function"){
+      errEl.textContent = "排行榜正在初始化，请稍等再点一次";
+      errEl.style.display = "block";
+      return;
+    }
     btn.disabled = true;
     btn.textContent = "上榜中...";
     try{
-      var key = KEY_PREFIX + Date.now() + "-" + Math.floor(Math.random()*100000);
-      var value = JSON.stringify({ nickname: state.nickname, score: state.correctCount, ts: Date.now() });
-      var res = await fetch(KVDB_BASE + "/" + key, { method:"POST", body:value });
-      if(res.ok){
-        boardSubmitted = true;
-        btn.textContent = "已上榜";
-        loadBoard();
-      } else {
-        btn.disabled = false;
-        btn.textContent = "上榜留名";
-        errEl.textContent = "上榜失败（状态码 " + res.status + "，再试一次）";
-        errEl.style.display = "block";
-      }
+      await window.submitLeaderboardEntry(state.nickname, state.correctCount);
+      boardSubmitted = true;
+      btn.textContent = "已上榜";
+      loadBoard();
     }catch(err){
       btn.disabled = false;
       btn.textContent = "上榜留名";
-      errEl.textContent = "上榜失败（网络/跨域被拦，再试一次）";
+      errEl.textContent = "上榜失败，再试一次";
       errEl.style.display = "block";
-      console.error("kvdb submit error:", err);
+      console.error("firebase submit error:", err);
     }
   });
 
