@@ -52,6 +52,25 @@
     list.sort(function(a, b){ return b.score - a.score || b.ts - a.ts; });
     return list.slice(0, 25);
   };
+
+  window.submitQuestionComment = async function(questionNumber, nickname, text){
+    const commentsRef = ref(db, "comments/" + questionNumber);
+    await push(commentsRef, { nickname: nickname || "匿名", text: text, ts: Date.now() });
+  };
+
+  window.loadQuestionComments = async function(questionNumber){
+    const commentsRef = ref(db, "comments/" + questionNumber);
+    const snap = await get(commentsRef);
+    var list = [];
+    snap.forEach(function(child){
+      var item = child.val();
+      if(item && typeof item.text === "string" && item.text.trim()){
+        list.push({ nickname: item.nickname || "匿名", text: item.text, ts: Number(item.ts) || 0 });
+      }
+    });
+    list.sort(function(a, b){ return b.ts - a.ts; });
+    return list;
+  };
 </script>
 
 <style>
@@ -124,6 +143,9 @@
     font-family:inherit;
   }
   .name-row input:focus{outline:none; border-color:var(--accent);}
+  .explain-actions{display:flex; gap:8px; align-items:stretch;}
+  .explain-actions input{flex:1; min-width:0; background:var(--bg); border:2px solid var(--ink); padding:13px 14px; color:var(--ink); font-size:15px; font-family:inherit;}
+  .explain-actions input:focus{outline:none; border-color:var(--accent);}
   .btn{
     border:2px solid var(--ink);
     padding:13px 16px;
@@ -244,6 +266,44 @@
   .board-row.me{background:var(--accent-soft); border-color:var(--accent);}
   .board-empty, .board-loading{font-size:13px; color:var(--ink-soft); padding:8px 0;}
 
+  .comment-title{font-size:14px; font-weight:900; margin-bottom:4px;}
+  .comment-hint{font-size:12px; color:var(--ink-soft); line-height:1.7; margin-bottom:10px;}
+  #commentInput{width:100%; min-height:100px; resize:vertical; background:var(--bg); border:2px solid var(--ink); padding:10px 12px; color:var(--ink); font-size:14px; line-height:1.7; font-family:inherit;}
+  #commentInput:focus{outline:none; border-color:var(--accent);}
+  .comment-submit-row{display:flex; align-items:center; justify-content:space-between; gap:8px; margin-top:8px;}
+  .comment-author{font-size:11.5px; color:var(--ink-soft); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .comment-error{font-size:12px; color:var(--bad); font-weight:700; margin-top:8px;}
+  .comment-list-title{font-size:12px; font-weight:900; margin:16px 0 8px;}
+  .comment-item{border-top:1px dashed var(--ink); padding:8px 0 0; margin-top:8px;}
+  .comment-item details{width:100%;}
+  .comment-item summary{cursor:pointer; list-style:none; font-size:12.5px; font-weight:700; display:flex; gap:8px; align-items:center;}
+  .comment-item summary::-webkit-details-marker{display:none;}
+  .comment-item summary::before{content:"＋"; flex:none; font-weight:900;}
+  .comment-item details[open] summary::before{content:"－";}
+  .comment-time{font-weight:400; color:var(--ink-soft); margin-left:auto;}
+  .comment-body{font-size:13.5px; line-height:1.8; color:var(--ink-soft); white-space:pre-line; padding:8px 0 4px 20px; word-break:break-word;}
+  .comment-empty{font-size:12.5px; color:var(--ink-soft); padding:6px 0;}
+
+  .quiz-comment-toggle{width:100%; margin-top:12px;}
+  .quiz-comment-box{display:none; border:2px solid var(--ink); padding:12px 14px; margin-top:12px; margin-bottom:14px; background:var(--panel);}
+  .quiz-comment-box.open{display:block;}
+  .quiz-comment-head{display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:6px;}
+  .quiz-comment-title{font-size:14px; font-weight:900;}
+  .quiz-comment-author{font-size:11.5px; color:var(--ink-soft);}
+  .quiz-comment-input{width:100%; min-height:90px; resize:vertical; background:var(--bg); border:2px solid var(--ink); padding:10px 12px; color:var(--ink); font-size:14px; line-height:1.7; font-family:inherit; margin-top:8px;}
+  .quiz-comment-input:focus{outline:none; border-color:var(--accent);}
+  .quiz-comment-actions{display:flex; justify-content:flex-end; margin-top:8px;}
+  .quiz-comment-list-title{font-size:12px; font-weight:900; margin:14px 0 8px;}
+  .quiz-comment-list .comment-item{border-top:1px dashed var(--ink); padding:8px 0 0; margin-top:8px;}
+  .quiz-comment-list .comment-item details{width:100%;}
+  .quiz-comment-list .comment-item summary{cursor:pointer; list-style:none; font-size:12.5px; font-weight:700; display:flex; gap:8px; align-items:center;}
+  .quiz-comment-list .comment-item summary::-webkit-details-marker{display:none;}
+  .quiz-comment-list .comment-item summary::before{content:"＋"; flex:none; font-weight:900;}
+  .quiz-comment-list .comment-item details[open] summary::before{content:"－";}
+  .quiz-comment-list .comment-time{font-weight:400; color:var(--ink-soft); margin-left:auto;}
+  .quiz-comment-list .comment-body{font-size:13.5px; line-height:1.8; color:var(--ink-soft); white-space:pre-line; padding:8px 0 4px 20px; word-break:break-word;}
+  .quiz-comment-list .comment-empty{font-size:12.5px; color:var(--ink-soft); padding:6px 0;}
+  .quiz-comment-error{font-size:12px; color:var(--bad); font-weight:700; margin-top:8px;}
   .footer-note{font-size:11.5px; color:var(--ink-soft); margin-top:22px;}
 
   .screen{display:none;}
@@ -253,6 +313,9 @@
     .brand h1{font-size:24px;}
     .card{padding:20px 16px;}
     .result-score .num{font-size:44px;}
+    .explain-actions{flex-wrap:wrap;}
+    .explain-actions input{flex-basis:100%;}
+    .explain-actions .btn{flex:1;}
   }
 </style>
 </head>
@@ -293,13 +356,28 @@
     <div class="screen" id="screen-quiz">
       <div class="progress-wrap">
         <div class="progress-top">
-          <span id="progressLabel">第 1 / 40 题</span>
+          <span id="progressLabel">第 1 / 66 题</span>
         </div>
         <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:2.5%;"></div></div>
       </div>
       <div id="multiTag" class="q-multi-tag" style="display:none;">这题选哪个都对，随便选</div>
       <div class="q-text" id="qText"></div>
       <div class="options" id="qOptions"></div>
+      <button class="btn quiz-comment-toggle" id="btnQuizComments">💬 查看 / 写本题批注</button>
+      <div class="quiz-comment-box" id="quizCommentBox">
+        <div class="quiz-comment-head">
+          <div class="quiz-comment-title" id="quizCommentTitle">第 1 题的批注</div>
+          <div class="quiz-comment-author" id="quizCommentAuthor">匿名</div>
+        </div>
+        <div style="font-size:12px; color:var(--ink-soft); line-height:1.7;">看到这道题有什么理解、吐槽、联想都可以写在这里。批注会显示你的昵称和时间。</div>
+        <textarea class="quiz-comment-input" id="quizCommentInput" maxlength="500" placeholder="写下你对这道题的批注……"></textarea>
+        <div class="quiz-comment-actions">
+          <button class="btn btn-primary" id="btnQuizSubmitComment">发布批注</button>
+        </div>
+        <div class="quiz-comment-error" id="quizCommentError" style="display:none;"></div>
+        <div class="quiz-comment-list-title">这道题的批注</div>
+        <div class="quiz-comment-list" id="quizCommentList"><div class="comment-empty">点击上方按钮加载批注</div></div>
+      </div>
       <div class="nav-row" style="justify-content:space-between;">
         <button class="btn" id="btnPrev" style="visibility:hidden;">上题选错了，再来</button>
         <button class="btn btn-primary" id="btnNext" disabled>下一题</button>
@@ -310,7 +388,7 @@
     <div class="screen" id="screen-result">
       <div class="result-score">
         <span class="num" id="scoreNum">0</span>
-        <span class="out-of"> / 40 分</span>
+        <span class="out-of"> / 66 分</span>
       </div>
       <div class="tier-title" id="tierTitle"></div>
       <div class="tier-desc" id="tierDesc"></div>
@@ -322,15 +400,29 @@
 
       <hr class="divider">
       <div class="board-title">对某道题有疑虑？解释都在这里哦</div>
-      <div class="board-sub">输入题号（1-40），看看昭矛线怎么说</div>
-      <div class="name-row" style="margin-bottom:10px;">
-        <input type="number" id="explainInput" min="1" max="40" placeholder="题号，比如 6">
+      <div class="board-sub">输入题号（1-66），看看昭矛线怎么说</div>
+      <div class="explain-actions" style="margin-bottom:10px;">
+        <input type="number" id="explainInput" min="1" max="66" placeholder="题号，比如 6">
         <button class="btn" id="btnExplain">查看解释</button>
+        <button class="btn" id="btnViewComments">查看批注</button>
       </div>
-      <div id="explainResult" style="display:none; border:2px solid var(--ink); padding:12px 14px; margin-bottom:22px;">
+      <div id="explainResult" style="display:none; border:2px solid var(--ink); padding:12px 14px; margin-bottom:14px;">
         <div id="explainQ" style="font-weight:900; font-size:14px; margin-bottom:6px;"></div>
         <div id="explainAnswer" style="font-weight:700; font-size:14px; color:var(--blue); margin-bottom:8px;"></div>
         <div id="explainText" style="font-size:14px; line-height:1.8; color:var(--ink-soft); white-space:pre-line;"></div>
+      </div>
+
+      <div id="commentBox" style="display:none; border:2px solid var(--ink); padding:12px 14px; margin-bottom:22px;">
+        <div class="comment-title" id="commentTitle">第 1 题的批注</div>
+        <div class="comment-hint">可以写你的理解、吐槽、补充，或者单纯留下你看到这道题时的第一反应。</div>
+        <textarea id="commentInput" maxlength="500" placeholder="写下你的批注……"></textarea>
+        <div class="comment-submit-row">
+          <span class="comment-author" id="commentAuthor">以匿名身份发布</span>
+          <button class="btn btn-primary" id="btnSubmitComment">发布批注</button>
+        </div>
+        <div class="comment-error" id="commentError" style="display:none;"></div>
+        <div class="comment-list-title">大家的批注</div>
+        <div id="commentList"><div class="comment-empty">批注加载中...</div></div>
       </div>
 
       <hr class="divider">
@@ -394,21 +486,47 @@
     {q:"我微博关注的第一个人", o:["王源","刘志宏","夜北大将军","黄锐"], c:2},
     {q:"如果可以的话，我最希望把哪项天赋点满", o:["唱歌","画画","写作","摄影"], c:2},
     {q:"我经常用哪个软件听歌", o:["网易云","酷狗","Q音","Spotify"], c:1},
-    {q:"最近我在看我朋友推荐的哪本书", o:["上海堡垒","九州刹那公子","但为君故","龙王世界的重启"], c:0}
+    {q:"最近我在看我朋友推荐的哪本书", o:["上海堡垒","九州刹那公子","但为君故","龙王世界的重启"], c:0},
+    {q:"我最喜欢的ip", o:["龙族","超兽武装","Roy6","哈利波特"], c:0},
+    {q:"我的英文名Cheyenne来源于什么", o:["一首歌","一条河","一所学校","一个人"], c:0},
+    {q:"以下哪个不是我的外号", o:["班主任","豆豆","魏什么","QG Fly"], c:3},
+    {q:"我最恐惧的二次群体", o:["过激嬷嬷","过激公公","系带（过激代入）","辱追"], c:0},
+    {q:"我在哪个平台没有与“网敌”大战三百回合过", o:["酷狗音乐","作业帮","oppo自带浏览器","易次元"], c:3},
+    {q:"我喜欢的第一个男明星", o:["林俊杰","李易峰","王源","白男（白鹿）"], c:1},
+    {q:"我对小动物的态度", o:["喜欢所有大众喜欢的小动物","除了对我有善意的猫狗都害怕","喜欢冷血动物","非常喜欢小猫小狗"], c:1},
+    {q:"我最爱的瓶装饮料", o:["栀栀乌龙","石榴云雾茶","可乐","椰子水"], c:0},
+    {q:"我最喜欢的奶茶品牌", o:["一点点","古茗","盗版鹿角巷","喜茶"], c:2},
+    {q:"我喝奶（果）茶的冰度甜度", o:["正常冰三分","少冰三分","少冰五分","少冰七分"], c:3},
+    {q:"以下的食物我不吃哪个", o:["螺蛳粉","臭豆腐","榴莲","菠萝蜜"], c:2},
+    {q:"我三代曾经最好感的人是谁", o:["穆祉丞","张峻豪","邓佳鑫","童禹坤"], c:1},
+    {q:"我四代曾经最好感的人是谁", o:["李煜东","杨博文","张桂源","王橹杰"], c:3},
+    {q:"我和一个人爆发不可挽回的巨大矛盾会怎样", o:["屏蔽朋友圈","删除好友","只拉黑不删除","当做无事发生"], c:2},
+    {q:"我喜欢被视奸嘛（多选）", o:["不喜欢被任何人视奸","喜欢被喜欢的人视奸","讨厌被讨厌的人视奸","不关心别人是否视奸我"], c:[0,1,2], multi:true},
+    {q:"我最多同时登录着多少个微博账号", o:["8个","12个","27个","33个"], c:3},
+    {q:"我最讨厌别人怎样对我", o:["造谣我","贬低我","蛐蛐我","无视我"], c:1},
+    {q:"我对朋友最大的需求", o:["耐心听我说话","陪我出去玩","和我同仇敌忾","给我提供帮助"], c:0},
+    {q:"我在龙族幻想里一见钟情的角色是", o:["绘梨衣","源稚生","雷娜塔","楚子航"], c:2},
+    {q:"我目前最喜欢王源哪首歌", o:["多云转晴又转阴","在哪里都很好","花瓣","我们都会变成雨降落"], c:0},
+    {q:"我爱着一个（）女孩", o:["红发","绿发","蓝发","紫发"], c:0},
+    {q:"我玩游戏最怕什么", o:["陌生大佬要带我","太菜被喷","被队友坑","一直卡关"], c:0},
+    {q:"我的第一个 个性签名是什么？", o:["陌上人如玉，公子世无双","回忆再美，终究是回忆","王者死","大炮开兮轰他niang"], c:0},
+    {q:"我王者有多少个好友", o:["50","300","500","800"], c:3},
+    {q:"我的最佳狐朋狗友是（不等于好朋友）", o:["不吃香菜的三分姐","究极邪恶的大糖包","金针菇梦女矿泉水","一起被孤立的叉子"], c:0},
+    {q:"最近最上头的抖音bgm", o:["那年梨花瘦","就这般望着你","称不上大方或性格张扬","思念是春蚕"], c:0}
   ];
 
   var TIERS = [
     {min:0,  max:0,  title:"排雷大师",
-      desc:"不是吧不是吧，你是怎么做到40道题全错的？这比全对的含金量还要高，您是我蛔虫里的肚子。"},
-    {min:1,  max:8,  title:"陌生的天使女孩",
+      desc:"不是吧不是吧，你是怎么做到66道题全错的？这比全对的含金量还要高，您是我蛔虫里的肚子。"},
+    {min:1,  max:13, title:"陌生的天使女孩",
       desc:"谢谢你来做我的测试～不管我们in不ins只要你做了我的测试并且没有对此嗤之以鼻我们就是好朋友，当然如果你是被我按头来做题的我会刊丝你哦"},
-    {min:9,  max:16, title:"我们是点点点头之交吗",
-      desc:"经过本人多番测试，随便乱选完全可以答对9-16题。不过如果你是认真作答的，我也不知道这难不难哈哈哈哈哈"},
-    {min:17, max:24, title:"你是我大眼珠子互关吧",
+    {min:14, max:26, title:"我们是点点点头之交吗",
+      desc:"经过本人多番测试，随便乱选完全可以答对14-26题。不过如果你是认真作答的，我也不知道这难不难哈哈哈哈哈"},
+    {min:27, max:39, title:"你是我大眼珠子互关吧",
       desc:"要么我和你有绿泡泡1个G以上的聊天记录要么我们是互关，又或者你真的用心看了我每一条发疯的朋友圈？否则我想不通你怎么能答对这么多题的"},
-    {min:25, max:31, title:"你在我huq住下了吧",
+    {min:40, max:51, title:"你在我huq住下了吧",
       desc:"G和小克都划分了这个梯度，我也不知道有没有人能答对这么多题，不管了"},
-    {min:32, max:40, title:"这昭矛线您来做吧",
+    {min:52, max:66, title:"这昭矛线您来做吧",
       desc:"原来真的能有人答对3/4以上?那你真的很了解我啦꒰˶>ᗜ<˶꒱谢谢你来做我的题还答对了这么多"}
   ];
 
@@ -452,7 +570,33 @@
     "当年的心情就是好喜欢她的作品想追随她，那时候哪里会玩什么微博呢。。",
     "出题的时候也在犹豫答案是画画还是写作，因为我觉得画画更能含蓄表达自己的灵魂，能否被读懂看缘分，写作相比来说更直白一些，但是想了想画画除了天赋也需要努力，而文字的天赋更多是信手拈来吧",
     "不用解释呀。",
-    "就五百多页看一半不想看了哈哈"
+    "就五百多页看一半不想看了哈哈",
+    "这太明显了，有啥好解释的",
+    "而我呢，我只是一个绝望的（前）Greyson吗梦女，“I'm a fool for you Cheyenne”，他的粉丝里有一大半英文名都是Cheyenne吧",
+    "D 因为确实没人这么叫我呀",
+    "不想解释。",
+    "可能因为玩易次元的时候年纪已经大了吧。然后易次元没有我极为心肝的存在",
+    "B 古剑奇谭。",
+    "会动的我都害怕啊啊啊，只喜欢长得萌的，或者特别乖的，而且明显不会抓我或者挠我的小猫小狗",
+    "我愿意为了栀栀乌龙成为杨紫梦女，我对这款饮料的好感都已经爱屋及乌到代言人身上了，一去好想来/赵一鸣我都要先去找杨紫",
+    "盗版的鹿角巷真的是白月光了（至今都没喝过正版的，说是正版我也不信哈哈）",
+    "不需要解释",
+    "也能吃但是很不爱吃，做成甜品有些能接受",
+    "因为他当时有点神似我很喜欢的一个文游男主，没想到看起来最人畜无害的小摩尔塌的最狠了",
+    "很喜欢阴湿男鬼林黛玉这款设定",
+    "我有被迫害妄想症，我一定要保留最原始的聊天记录，删了聊天记录就没有了",
+    "我很喜欢被好感、不抵触的人用善意的目光注视（把我当电子宠物不被我知道也行），但我很讨厌我不喜欢的人过度窥视我",
+    "我们干微博运营的是这样的",
+    "我会炸",
+    "不需要解释呀",
+    "像是温柔阳光的邻家姐姐，建模也非常好看（虽然严重ooc了）",
+    "但是对小好也非常上头",
+    "选不对的可以被我刊丝咯",
+    "对好意最社恐，而且太菜会有负罪感",
+    "反正是我没删的最早的QQ个签",
+    "我也想不到，大概是我同担们吧",
+    "我和三分的双向奔赴",
+    "我想用这个bgm发一百个作品"
   ];
 
   function getTier(score){
@@ -518,6 +662,15 @@
   var progressLabel = document.getElementById("progressLabel");
   var progressFill = document.getElementById("progressFill");
   var multiTag = document.getElementById("multiTag");
+  var btnQuizComments = document.getElementById("btnQuizComments");
+  var quizCommentBox = document.getElementById("quizCommentBox");
+  var quizCommentTitle = document.getElementById("quizCommentTitle");
+  var quizCommentAuthor = document.getElementById("quizCommentAuthor");
+  var quizCommentInput = document.getElementById("quizCommentInput");
+  var quizCommentList = document.getElementById("quizCommentList");
+  var quizCommentError = document.getElementById("quizCommentError");
+  var btnQuizSubmitComment = document.getElementById("btnQuizSubmitComment");
+  var quizCommentQuestion = null;
 
   function startQuiz(){
     state.current = 0;
@@ -536,6 +689,14 @@
     multiTag.textContent = "多选题·可以选多个选项";
     qTextEl.textContent = item.q;
     qOptionsEl.innerHTML = "";
+    quizCommentQuestion = idx + 1;
+    quizCommentBox.classList.remove("open");
+    btnQuizComments.textContent = "💬 查看 / 写本题批注";
+    quizCommentTitle.textContent = "第 " + (idx + 1) + " 题的批注";
+    quizCommentAuthor.textContent = state.nickname ? "“" + state.nickname + "”" : "匿名";
+    quizCommentInput.value = "";
+    quizCommentError.style.display = "none";
+    quizCommentList.innerHTML = '<div class="comment-empty">点击上方按钮加载批注</div>';
     btnPrev.style.visibility = (idx === 0) ? "hidden" : "visible";
 
     var letters = ["A","B","C","D"];
@@ -544,209 +705,4 @@
       btn.className = "option";
       btn.innerHTML = '<span class="tag">'+letters[optIdx]+'</span><span>'+optText+'</span>';
       btn.addEventListener("click", function(){ chooseOption(optIdx); });
-      qOptionsEl.appendChild(btn);
-    });
-
-    // restore a previously chosen answer for this question, if any
-    var prevAns = state.answered[idx];
-    var optionEls = qOptionsEl.querySelectorAll(".option");
-    var hasAnswer = item.multi ? (Array.isArray(prevAns) && prevAns.length > 0) : (prevAns !== null);
-    if(hasAnswer){
-      optionEls.forEach(function(el, i){
-        var isSelected = item.multi ? prevAns.indexOf(i) !== -1 : i === prevAns;
-        el.classList.toggle("selected", isSelected);
-      });
-    }
-    btnNext.disabled = !hasAnswer;
-    btnNext.textContent = (idx === QUESTIONS.length-1) ? "查看结果" : "下一题";
-  }
-
-  function chooseOption(optIdx){
-    var item = QUESTIONS[state.current];
-    var optionEls = qOptionsEl.querySelectorAll(".option");
-
-    if(item.multi){
-      var picked = state.answered[state.current];
-      if(!Array.isArray(picked)) picked = [];
-      var pos = picked.indexOf(optIdx);
-      if(pos === -1) picked.push(optIdx); else picked.splice(pos, 1);
-      state.answered[state.current] = picked;
-      optionEls.forEach(function(el, i){
-        el.classList.toggle("selected", picked.indexOf(i) !== -1);
-      });
-      btnNext.disabled = picked.length === 0;
-    } else {
-      state.answered[state.current] = optIdx;
-      optionEls.forEach(function(el, i){
-        el.classList.toggle("selected", i === optIdx);
-      });
-      btnNext.disabled = false;
-    }
-  }
-
-  btnNext.addEventListener("click", function(){
-    if(state.current < QUESTIONS.length - 1){
-      state.current++;
-      renderQuestion();
-    } else {
-      finishQuiz();
-    }
-  });
-
-  btnPrev.addEventListener("click", function(){
-    if(state.current > 0){
-      state.current--;
-      renderQuestion();
-    }
-  });
-
-  // ---------- result ----------
-  var scoreNumEl = document.getElementById("scoreNum");
-  var tierTitleEl = document.getElementById("tierTitle");
-  var tierDescEl = document.getElementById("tierDesc");
-  var boardSubmitted = false;
-
-  function computeScore(){
-    var score = 0;
-    for(var i=0;i<QUESTIONS.length;i++){
-      var ans = state.answered[i];
-      var item = QUESTIONS[i];
-      if(item.multi){
-        if(Array.isArray(ans) && ans.length === item.o.length) score++;
-      } else {
-        if(ans !== null && ans === item.c) score++;
-      }
-    }
-    return score;
-  }
-
-  function finishQuiz(){
-    var score = computeScore();
-    state.correctCount = score;
-    var tier = getTier(score);
-    scoreNumEl.textContent = score;
-    tierTitleEl.textContent = tier.title;
-    if(tier.desc){
-      tierDescEl.textContent = tier.desc;
-      tierDescEl.classList.remove("empty");
-    } else {
-      tierDescEl.textContent = "";
-      tierDescEl.classList.add("empty");
-    }
-    boardSubmitted = false;
-    var submitBtn = document.getElementById("btnSubmitBoard");
-    submitBtn.disabled = false;
-    submitBtn.textContent = "上榜留名";
-    document.getElementById("boardSubmitError").style.display = "none";
-    document.getElementById("configNote").style.display = boardConfigured ? "none" : "block";
-    document.getElementById("explainResult").style.display = "none";
-    document.getElementById("explainInput").value = "";
-    show("screen-result");
-    loadBoard();
-  }
-
-  document.getElementById("btnRetry").addEventListener("click", function(){
-    nicknameInput.value = "";
-    nameErrorEl.style.display = "none";
-    show("screen-nickname");
-    nicknameInput.focus();
-  });
-
-  // ---------- explanation lookup ----------
-  var explainInput = document.getElementById("explainInput");
-  var explainResult = document.getElementById("explainResult");
-  var explainQ = document.getElementById("explainQ");
-  var explainAnswer = document.getElementById("explainAnswer");
-  var explainText = document.getElementById("explainText");
-  var LETTERS = ["A","B","C","D"];
-
-  document.getElementById("btnExplain").addEventListener("click", function(){
-    var n = parseInt(explainInput.value, 10);
-    if(!n || n < 1 || n > QUESTIONS.length){
-      explainResult.style.display = "block";
-      explainQ.textContent = "";
-      explainAnswer.textContent = "";
-      explainText.textContent = "填个 1 到 " + QUESTIONS.length + " 之间的题号叭";
-      return;
-    }
-    var item = QUESTIONS[n-1];
-    explainQ.textContent = "第 " + n + " 题：" + item.q;
-    explainAnswer.textContent = item.multi ? "本题多选，选哪个都算对" : (LETTERS[item.c] + ". " + item.o[item.c]);
-    explainText.textContent = EXPLANATIONS[n-1];
-    explainResult.style.display = "block";
-  });
-
-  // ---------- leaderboard (Firebase Realtime Database, works on any static host) ----------
-  var boardListEl = document.getElementById("boardList");
-
-  async function loadBoard(){
-    if(!boardConfigured){
-      boardListEl.innerHTML = '<li class="board-empty">排行榜还没配置好，见下方提示</li>';
-      return;
-    }
-    boardListEl.innerHTML = '<li class="board-loading">排行榜加载中...</li>';
-    if(typeof window.loadLeaderboardEntries !== "function"){
-      boardListEl.innerHTML = '<li class="board-loading">排行榜正在初始化，请稍等重试</li>';
-      return;
-    }
-    try{
-      var entries = await window.loadLeaderboardEntries();
-      if(!entries || entries.length === 0){
-        boardListEl.innerHTML = '<li class="board-empty">还没有人上榜，你可以成为第一个</li>';
-        return;
-      }
-      boardListEl.innerHTML = "";
-      entries.forEach(function(e, i){
-        var li = document.createElement("li");
-        var displayName = (e.nickname && String(e.nickname).trim()) ? String(e.nickname).trim() : "匿名";
-        var sameEntryName = state.nickname ? displayName === state.nickname : displayName === "匿名";
-        li.className = "board-row" + (sameEntryName && e.score === state.correctCount ? " me" : "");
-        li.innerHTML = '<span class="rank">'+(i+1)+'</span><span class="name">'+escapeHtml(displayName)+'</span><span class="score">'+e.score+' 分</span>';
-        boardListEl.appendChild(li);
-      });
-    }catch(err){
-      boardListEl.innerHTML = '<li class="board-empty">排行榜暂时加载不出来，晚点再试试</li>';
-      console.error("leaderboard load error:", err);
-    }
-  }
-
-  function escapeHtml(str){
-    var div = document.createElement("div");
-    div.textContent = str;
-    return div.innerHTML;
-  }
-
-  document.getElementById("btnSubmitBoard").addEventListener("click", async function(){
-    if(boardSubmitted) return;
-    var btn = this;
-    var errEl = document.getElementById("boardSubmitError");
-    errEl.style.display = "none";
-    if(!boardConfigured){
-      document.getElementById("configNote").style.display = "block";
-      return;
-    }
-    if(typeof window.submitLeaderboardEntry !== "function"){
-      errEl.textContent = "排行榜正在初始化，请稍等再点一次";
-      errEl.style.display = "block";
-      return;
-    }
-    btn.disabled = true;
-    btn.textContent = "上榜中...";
-    try{
-      await window.submitLeaderboardEntry(state.nickname || "匿名", state.correctCount);
-      boardSubmitted = true;
-      btn.textContent = "已上榜";
-      loadBoard();
-    }catch(err){
-      btn.disabled = false;
-      btn.textContent = "上榜留名";
-      errEl.textContent = "上榜失败，再试一次";
-      errEl.style.display = "block";
-      console.error("firebase submit error:", err);
-    }
-  });
-
-})();
-</script>
-</body>
-     </html>
+    
