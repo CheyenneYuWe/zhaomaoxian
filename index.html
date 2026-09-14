@@ -71,6 +71,12 @@
     list.sort(function(a, b){ return b.ts - a.ts; });
     return list;
   };
+
+  // 保存每次完整作答结果：昵称、时间、总分、每题选择、正确答案、对错
+  window.submitQuizResult = async function(result){
+    const resultsRef = ref(db, "results");
+    await push(resultsRef, result);
+  };
 </script>
 
 <style>
@@ -249,6 +255,65 @@
   .tier-desc{font-size:14.5px; line-height:1.85; color:var(--ink-soft); margin:0 0 22px; white-space:pre-line;}
   .tier-desc.empty{display:none;}
 
+  .q-reaction{display:none; position:relative; width:100%; margin:18px 0 6px; min-height:0; text-align:center; z-index:3;}
+  .q-reaction.open{display:block;}
+  .reaction-overlay{display:none; position:fixed; inset:0; z-index:9999; pointer-events:none;}
+  .reaction-popup{position:relative; width:100%; max-width:560px; margin:0 auto; padding:8px 18px 4px; box-sizing:border-box; background:transparent; border:0; box-shadow:none; text-align:center; font-size:22px; font-weight:950; line-height:1.7; letter-spacing:.02em; pointer-events:none; opacity:0; transform:translateY(14px); filter:blur(5px); will-change:opacity,transform,filter; animation:reactionFadeIn .58s cubic-bezier(.16,.75,.25,1) forwards;}
+  .reaction-popup.error{color:#c52f3d; text-shadow:0 0 0 rgba(0,0,0,0), 0 0 2px rgba(125,0,12,.35), 0 1px 7px rgba(145,0,15,.16);}
+  .reaction-popup.success{color:#181818; text-shadow:0 1px 0 rgba(255,255,255,.95), 0 2px 8px rgba(0,0,0,.16), 0 0 16px rgba(255,255,255,.7); letter-spacing:.035em;}
+  .reaction-popup.q61-flow{font-size:24px; line-height:1.55; letter-spacing:.025em; padding-top:16px; padding-bottom:14px;}
+  .reaction-popup.q61-flow button{display:block; margin:18px auto 0; min-width:88px; border:2px solid currentColor; border-radius:5px; background:#fff; box-shadow:3px 3px 0 rgba(0,0,0,.12); padding:8px 20px; color:inherit; font-size:15px; font-weight:900; text-decoration:none; pointer-events:auto;}
+  .reaction-popup.q61-flow button:hover{background:#fff; transform:translateY(-1px);}
+  .reaction-popup button{pointer-events:auto;}
+  .reaction-close-btn{border-radius:0;}
+  .q61-threat-layer{position:fixed; inset:0; z-index:9998; pointer-events:none; overflow:hidden; display:none; background:#fff;}
+  .q61-threat-layer.open{display:block;}
+  .q61-threat-word{position:absolute; color:#c72e3d; font-weight:1000; line-height:1; white-space:nowrap; user-select:none; opacity:0; text-shadow:0 0 0 rgba(0,0,0,0), 0 0 2px rgba(120,0,10,.28), 0 2px 7px rgba(120,0,10,.12); filter:blur(1.2px); animation:q61ThreatIn var(--d) cubic-bezier(.16,.72,.2,1) forwards;}
+  .q61-threat-word::after{content:""; position:absolute; inset:-5px -7px; background:radial-gradient(ellipse, rgba(215,40,58,.08) 0%, rgba(215,40,58,0) 70%); z-index:-1;}
+  @keyframes q61ThreatIn{
+    0%{opacity:0; transform:rotate(var(--r)) translateY(5px) scale(.985); filter:blur(1.8px);}
+    18%{opacity:.42; transform:rotate(var(--r)) translateY(2px) scale(.994); filter:blur(.7px);}
+    34%{opacity:.9; transform:rotate(var(--r)) translateY(0) scale(1); filter:blur(.12px);}
+    68%{opacity:1; transform:rotate(var(--r)) translateY(0) scale(1); filter:blur(0);}
+    86%{opacity:.82; transform:rotate(var(--r)) translateY(-1px) scale(.998); filter:blur(.15px);}
+    100%{opacity:0; transform:rotate(var(--r)) translateY(-4px) scale(.994); filter:blur(.8px);}
+  }
+  @keyframes reactionFadeIn{
+    0%{opacity:0; filter:blur(1.8px); transform:translateY(7px) scale(.992);}
+    42%{opacity:.72; filter:blur(.45px); transform:translateY(2px) scale(.998);}
+    72%{opacity:.96; filter:blur(.08px); transform:translateY(.4px) scale(1);}
+    100%{opacity:1; filter:blur(0); transform:translateY(0) scale(1);}
+  }
+  @keyframes reactionPop{from{transform:scale(.96);opacity:0;}to{transform:scale(1);opacity:1;}}
+  @keyframes reactionShake{0%{transform:translateX(-3px) rotate(-.2deg);}30%{transform:translateX(3px) rotate(.2deg);}60%{transform:translateX(-2px) rotate(-.1deg);}100%{transform:translateX(0) rotate(0);}}
+  .q-reaction-confirm{margin-top:10px;}
+  .result-extra{border:2px solid var(--ink); padding:14px; margin:14px 0;}
+  #recognitionBox{background:var(--panel); border-left-width:5px;}
+  #predictionBox{background:var(--bg); border-style:dashed; border-right-width:5px;}
+  #wrongReviewBox{background:var(--panel); box-shadow:4px 4px 0 var(--ink);}
+  .result-extra-title{font-size:14px; font-weight:900; margin-bottom:8px;}
+  .result-extra-text{font-size:13.5px; line-height:1.8; color:var(--ink-soft); white-space:pre-line;}
+  .result-extra strong{color:var(--ink);}
+  #recognitionBox .result-extra-title::before{content:"01  ·  ";}
+  #predictionBox .result-extra-title::before{content:"02  ·  ";}
+  #wrongReviewBox .result-extra-title::before{content:"03  ·  ";}
+  .analysis-box{padding:22px 16px; text-align:center;}
+  .analysis-title{font-size:18px; font-weight:900; margin-bottom:12px;}
+  .analysis-sub{font-size:14px; line-height:1.8; color:var(--ink-soft); white-space:pre-line;}
+  .analysis-bar{height:10px; border:2px solid var(--ink); margin:18px 0 20px; overflow:hidden;}
+  .analysis-fill{height:100%; width:0; background:var(--ink); transition:width .15s linear;}
+  .analysis-lines{font-size:14px; line-height:2; font-weight:700; white-space:pre-line; min-height:84px;}
+  .wrong-review{display:none; margin-top:12px;}
+  .wrong-review.open{display:block;}
+  #wrongReviewSummary{cursor:pointer; user-select:none; padding:10px 12px; border:1px dashed var(--ink); background:var(--bg); font-weight:900;}
+  #wrongReviewSummary::after{content:"  ＋"; float:right;}
+  #wrongReviewSummary.open::after{content:"  －";}
+  .wrong-review .review-row{border-top:1px dashed var(--ink); padding:10px 0; font-size:12.5px; line-height:1.8; color:var(--ink-soft);}
+  .wrong-review .review-q{font-size:13px; font-weight:900; color:var(--ink); margin-bottom:2px;}
+  .anomaly-box{display:none; margin:12px 0 2px; padding:12px 14px; border:2px solid var(--ink); background:var(--panel); font-size:14px; font-weight:900; line-height:1.7; text-align:center;}
+  .anomaly-box .anomaly-sub{font-size:13px; font-weight:700; margin-top:4px;}
+  .q61-easter-egg{display:none; margin:12px 0 2px; padding:12px 14px; border:2px solid var(--ink); background:var(--panel); color:var(--ink); font-size:14px; font-weight:900; line-height:1.7; text-align:center;}
+
   .result-actions{display:flex; gap:8px; margin-bottom:4px;}
   .divider{border:none; border-top:2px dashed var(--ink); margin:26px 0 18px;}
 
@@ -262,8 +327,7 @@
   }
   .board-row .rank{flex:none; width:20px; font-weight:900;}
   .board-row .name{flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
-  .board-row .score{flex:none; font-weight:900; color:var(--accent);}
-  .board-row.me{background:var(--accent-soft); border-color:var(--accent);}
+  .board-row .score{flex:none; font-weight:900;}
   .board-empty, .board-loading{font-size:13px; color:var(--ink-soft); padding:8px 0;}
 
   .comment-title{font-size:14px; font-weight:900; margin-bottom:4px;}
@@ -363,6 +427,9 @@
       <div id="multiTag" class="q-multi-tag" style="display:none;">这题选哪个都对，随便选</div>
       <div class="q-text" id="qText"></div>
       <div class="options" id="qOptions"></div>
+      <div class="q-reaction" id="qReaction"></div>
+      <div class="anomaly-box" id="anomalyBox"><div>系统检测到一个异常情况。</div><div class="anomaly-sub">你似乎对昭矛线存在严重认知偏差。</div></div>
+      <div class="q61-easter-egg" id="q61EasterEgg"></div>
       <button class="btn quiz-comment-toggle" id="btnQuizComments">💬 查看 / 写本题批注</button>
       <div class="quiz-comment-box" id="quizCommentBox">
         <div class="quiz-comment-head">
@@ -384,7 +451,20 @@
       </div>
     </div>
 
-    <!-- Screen 4: result -->
+    <!-- Screen 4: analysis -->
+    <div class="screen" id="screen-analysis">
+      <div class="analysis-box">
+        <div class="analysis-title">恭喜。</div>
+        <div class="analysis-sub">你已经完成了对昭矛线的了解度测试。</div>
+        <div style="height:18px;"></div>
+        <div class="analysis-sub">现在开始计算结果……</div>
+        <div class="analysis-bar"><div class="analysis-fill" id="analysisFill"></div></div>
+        <div class="analysis-sub" id="analysisStatus">正在分析你……</div>
+        <div class="analysis-lines" id="analysisLines"></div>
+      </div>
+    </div>
+
+    <!-- Screen 5: result -->
     <div class="screen" id="screen-result">
       <div class="result-score">
         <span class="num" id="scoreNum">0</span>
@@ -392,6 +472,19 @@
       </div>
       <div class="tier-title" id="tierTitle"></div>
       <div class="tier-desc" id="tierDesc"></div>
+      <div class="result-extra" id="recognitionBox">
+        <div class="result-extra-title">你到底有多了解昭矛线</div>
+        <div class="result-extra-text" id="recognitionText"></div>
+      </div>
+      <div class="result-extra" id="predictionBox">
+        <div class="result-extra-title">昭矛线觉得你会怎么选？</div>
+        <div class="result-extra-text" id="predictionText"></div>
+      </div>
+      <div class="result-extra" id="wrongReviewBox">
+        <div class="result-extra-title">错题回放</div>
+        <div class="result-extra-text" id="wrongReviewSummary"></div>
+        <div class="wrong-review" id="wrongReview"></div>
+      </div>
       <div class="result-actions">
         <button class="btn" style="flex:1;" id="btnRetry">让我再蒙一次吧</button>
         <button class="btn btn-primary" style="flex:1;" id="btnSubmitBoard">上榜留名</button>
@@ -480,7 +573,7 @@
     {q:"我最讨厌谁（生物学上的）", o:["表哥","表姐","表弟","表妹"], c:2},
     {q:"之前入职冈易的时候我最想私联（在办公软件上骚扰）的人是谁", o:["丁磊","Lily","木儿","叶弄舟"], c:2},
     {q:"我喜欢一个人的态度是", o:["全肯定","辱骂式追星","嬷ta嬷ta","淡淡的就好"], c:0},
-    {q:"为什么我嗑CP从来不肯给家产一个名分", o:["我一直是梦嗑etj","偷吃的饭总是最香","wpg所以不领粉籍","顶多偶尔嗑几嘴"], c:0, multi:true},
+    {q:"为什么我嗑CP从来不肯给家产一个名分", o:["我一直是梦嗑etj","偷吃的饭总是最香","wpg所以不领粉籍","顶多偶尔嗑几嘴"], c:[0,1,2,3], multi:true},
     {q:"我最喜欢的作家", o:["江南","夜北","小禾棠","边鹿"], c:1},
     {q:"以下哪件事情我没做过", o:["高中在主任门缝塞举报信","在广播站门口粘纸条点歌","骑电驴的时候倒在了粪坑上","在客厅走着走着把自己平地甩飞了"], c:2},
     {q:"我微博关注的第一个人", o:["王源","刘志宏","夜北大将军","黄锐"], c:2},
@@ -604,10 +697,9 @@
       if(score>=TIERS[i].min && score<=TIERS[i].max) return TIERS[i];
     }
     return TIERS[0];
-  }
-
-  // ---------- state ----------
-  var state = { nickname:"", current:0, answered:[], correctCount:0 };
+     }
+     // ---------- state ----------
+  var state = { nickname:"", current:0, answered:[], correctCount:0, reactionShown:{}, anomalyShown:{}, keyWarningShown:false, q61Confirmed:false, correctStreak:0, wrongStreak:0 };
 
   function show(id){
     document.querySelectorAll(".screen").forEach(function(el){ el.classList.remove("active"); });
@@ -676,12 +768,24 @@
     state.current = 0;
     state.answered = new Array(QUESTIONS.length).fill(null);
     state.correctCount = 0;
+    state.reactionShown = {};
+    state.anomalyShown = {};
+    state.keyWarningShown = false;
+    state.q61Confirmed = false;
+    state.correctStreak = 0;
+    state.wrongStreak = 0;
     show("screen-quiz");
     renderQuestion();
-  }
-
-  function renderQuestion(){
+     }
+     function renderQuestion(){
     var idx = state.current;
+    var q61Egg = document.getElementById("q61EasterEgg");
+    var qReaction = document.getElementById("qReaction");
+    var anomalyBox = document.getElementById("anomalyBox");
+    if(q61Egg) q61Egg.style.display = "none";
+    if(qReaction){ qReaction.style.display = "none"; qReaction.innerHTML = ""; }
+    if(anomalyBox) anomalyBox.style.display = "none";
+    state.q61Confirmed = false;
     var item = QUESTIONS[idx];
     progressLabel.textContent = "第 " + (idx+1) + " / " + QUESTIONS.length + " 题";
     progressFill.style.width = (((idx+1)/QUESTIONS.length)*100) + "%";
@@ -705,7 +809,7 @@
       btn.className = "option";
       btn.innerHTML = '<span class="tag">'+letters[optIdx]+'</span><span>'+optText+'</span>';
       btn.addEventListener("click", function(){ chooseOption(optIdx); });
-     qOptionsEl.appendChild(btn);
+      qOptionsEl.appendChild(btn);
     });
 
     // restore a previously chosen answer for this question, if any
@@ -720,29 +824,212 @@
     }
     btnNext.disabled = !hasAnswer;
     btnNext.textContent = (idx === QUESTIONS.length-1) ? "查看结果" : "下一题";
+
+    // 一进入第61题先出现凝视提示；直接插在选项下面，不覆盖原题文字。
+    if(idx === 60){
+      setTimeout(function(){
+        if(state.current !== 60) return;
+        var qReactionEl=document.getElementById("qReaction");
+        if(!qReactionEl) return;
+        qReactionEl.style.display="block";
+        qReactionEl.className="q-reaction open";
+        qReactionEl.innerHTML='<div class="reaction-popup error q61-flow">昭矛线正在凝视着你的答案……</div>';
+        var p=qReactionEl.querySelector(".reaction-popup");
+        if(p){ p.style.animation="none"; void p.offsetWidth; p.style.animation="reactionFadeIn .58s cubic-bezier(.16,.75,.25,1) forwards"; }
+        // 凝视只停留片刻，避免答对后一直挂在页面上。
+        setTimeout(function(){
+          if(state.current===60 && qReactionEl && qReactionEl.classList.contains("open") && qReactionEl.textContent.indexOf("昭矛线正在凝视着你的答案")!==-1){
+            qReactionEl.classList.remove("open");
+            qReactionEl.innerHTML="";
+          }
+        },2200);
+      },120);
+    }
+  }
+
+  function positionReactionPopup(){
+    // 反应文案现在位于题目 DOM 的独立占位区，不再覆盖题干、选项或其他文字。
+     }
+     function showQ61Threat(){
+    var layer=document.getElementById("q61ThreatLayer");
+    if(!layer) return;
+    layer.innerHTML="";
+    var w=window.innerWidth, h=window.innerHeight;
+    var cols = w < 430 ? 5 : 7;
+    var rows = w < 430 ? 12 : 10;
+    var cellW=w/cols, cellH=h/rows;
+    var total=cols*rows;
+    for(var i=0;i<total;i++){
+      var el=document.createElement("span");
+      el.className="q61-threat-word";
+      el.textContent="我大四你";
+      var col=i%cols, row=Math.floor(i/cols);
+      var maxSafe=Math.max(13, Math.floor(cellW*0.43));
+      var size=13+Math.floor(Math.random()*Math.max(3,maxSafe-12));
+      if(i%17===0) size=Math.min(maxSafe,21);
+      else if(i%9===0) size=Math.min(maxSafe,19);
+      var x=col*cellW+cellW/2, y=row*cellH+cellH/2;
+      el.style.fontSize=size+"px";
+      el.style.width=(cellW*.92)+"px";
+      el.style.textAlign="center";
+      el.style.left=(x-cellW*.46)+"px";
+      el.style.top=Math.max(0,Math.min(h-size-2,y-size*.55))+"px";
+      el.style.setProperty("--r",(Math.random()*10-5).toFixed(1)+"deg");
+      el.style.setProperty("--d",(4.4+Math.random()*.9).toFixed(2)+"s");
+      el.style.animationDelay=(row*.075+col*.035+Math.random()*.16).toFixed(2)+"s";
+      layer.appendChild(el);
+    }
+    layer.classList.add("open");
+    layer.setAttribute("aria-hidden","false");
+    // 比之前多约2秒，给整屏动画更完整的进入、停留和退场。
+    setTimeout(function(){
+      layer.classList.remove("open");
+      layer.setAttribute("aria-hidden","true");
+      layer.innerHTML="";
+    },4450);
+  }
+
+  function showReaction(html, key, isError, duration){
+    if(state.reactionShown[key]) return false;
+    state.reactionShown[key]=true;
+    var qReactionEl=document.getElementById("qReaction");
+    if(!qReactionEl) return false;
+    qReactionEl.style.display="block";
+    qReactionEl.className="q-reaction open";
+    qReactionEl.innerHTML='<div class="reaction-popup '+(isError?'error':'success')+'">'+html+'</div>';
+    var popup=qReactionEl.querySelector(".reaction-popup");
+    if(popup){
+      popup.style.animation="none";
+      void popup.offsetWidth;
+      popup.style.animation="reactionFadeIn .58s cubic-bezier(.16,.75,.25,1) forwards";
+    }
+    setTimeout(function(){
+      if(qReactionEl.classList.contains("open") && !qReactionEl.querySelector(".q61-flow")){
+        qReactionEl.classList.remove("open");
+        qReactionEl.innerHTML="";
+      }
+    }, duration || 1900);
+    return true;
+  }
+
+  function closeReaction(){
+    var overlay=document.getElementById("reactionOverlay");
+    if(overlay){ overlay.classList.remove("open"); overlay.setAttribute("aria-hidden","true"); }
+  }
+
+  document.addEventListener("click", function(e){
+    var overlay=document.getElementById("reactionOverlay");
+    if(e.target===overlay) closeReaction();
+  });
+
+  function checkAnomaly(idx, optIdx){
+    var triggers = {10:3, 15:3, 32:1, 54:3};
+    if(triggers[idx] !== optIdx || state.anomalyShown[idx]) return;
+    state.anomalyShown[idx] = true;
+    showReaction('<div>系统检测到一个异常情况。</div><div style="font-size:13px;margin-top:5px;">你似乎对昭矛线存在严重认知偏差。</div>', "anomaly-"+idx, true);
+  }
+
+  function isAnswerCorrect(item, ans){
+    if(item.multi){
+      var a = Array.isArray(ans) ? ans.slice().sort() : [];
+      var c = Array.isArray(item.c) ? item.c.slice().sort() : [];
+      return a.length === c.length && a.every(function(v,i){return v===c[i];});
+    }
+    return ans !== null && ans === item.c;
+  }
+
+  function checkKeyQuestionThreshold(){
+    var keys = [3,9,17,19,21,30,38,40,57,60];
+    var wrong = 0;
+    keys.forEach(function(i){
+      if(state.answered[i] === null) return;
+      if(!isAnswerCorrect(QUESTIONS[i], state.answered[i])) wrong++;
+    });
+    if(wrong >= 5 && !state.keyWarningShown){
+      state.keyWarningShown = true;
+      showReaction('<div>您似乎并不了解昭矛线</div><div style="font-size:13px;margin-top:4px;">你今天晚上睡觉最好留一只眼睛站岗。</div>', "key-warning", true);
+    }
   }
 
   function chooseOption(optIdx){
     var item = QUESTIONS[state.current];
     var optionEls = qOptionsEl.querySelectorAll(".option");
+    var idx = state.current;
 
     if(item.multi){
-      var picked = state.answered[state.current];
+      var picked = state.answered[idx];
       if(!Array.isArray(picked)) picked = [];
       var pos = picked.indexOf(optIdx);
       if(pos === -1) picked.push(optIdx); else picked.splice(pos, 1);
-      state.answered[state.current] = picked;
-      optionEls.forEach(function(el, i){
-        el.classList.toggle("selected", picked.indexOf(i) !== -1);
-      });
+      state.answered[idx] = picked;
+      optionEls.forEach(function(el, i){ el.classList.toggle("selected", picked.indexOf(i) !== -1); });
       btnNext.disabled = picked.length === 0;
-    } else {
-      state.answered[state.current] = optIdx;
-      optionEls.forEach(function(el, i){
-        el.classList.toggle("selected", i === optIdx);
-      });
-      btnNext.disabled = false;
+      checkAnomaly(idx,optIdx);
+      checkKeyQuestionThreshold();
+      return;
     }
+
+    // Q61：选错后，确认流程固定插在选项下面；没点“确定”无法进入下一题。
+    if(idx === 60 && optIdx !== item.c && !state.q61Confirmed){
+      state.answered[idx]=optIdx;
+      optionEls.forEach(function(el,i){ el.classList.toggle("selected",i===optIdx); });
+      btnNext.disabled=true;
+      var qReactionEl=document.getElementById("qReaction");
+      if(qReactionEl){
+        qReactionEl.style.display="block";
+        qReactionEl.className="q-reaction open";
+        qReactionEl.innerHTML='<div class="reaction-popup error q61-flow">……你确定？<button class="btn q-reaction-confirm" id="q61ConfirmBtn">确定</button></div>';
+        var popup=qReactionEl.querySelector(".reaction-popup");
+        if(popup){ popup.style.animation="none"; void popup.offsetWidth; popup.style.animation="reactionFadeIn .58s cubic-bezier(.16,.75,.25,1) forwards"; }
+        var confirmBtn=document.getElementById("q61ConfirmBtn");
+        if(confirmBtn) confirmBtn.addEventListener("click",function(){
+          state.q61Confirmed=true;
+          qReactionEl.innerHTML='<div class="reaction-popup error q61-flow">昭矛线沉默了。<div style="margin-top:16px;">你怎么敢答错的？你跟我一直是假玩是吧！</div><button class="btn q-reaction-confirm" id="q61ContinueBtn">继续</button></div>';
+          var popup2=qReactionEl.querySelector(".reaction-popup");
+          if(popup2){ popup2.style.animation="none"; void popup2.offsetWidth; popup2.style.animation="reactionFadeIn .58s cubic-bezier(.16,.75,.25,1) forwards"; }
+          var continueBtn=document.getElementById("q61ContinueBtn");
+          if(continueBtn) continueBtn.addEventListener("click",function(){
+            qReactionEl.classList.remove("open");
+            qReactionEl.innerHTML="";
+            showQ61Threat();
+            btnNext.disabled=false;
+            state.wrongStreak++;
+            state.correctStreak=0;
+            checkKeyQuestionThreshold();
+            if(state.wrongStreak===5) showReaction('连续答错了5次，你是不是对我有什么误解？',"streak-wrong-5",true);
+          });
+        });
+      }
+      return;
+    }
+    if(idx === 60 && optIdx === item.c){
+      state.q61Confirmed = true;
+      var eggOk = document.getElementById("q61EasterEgg");
+      if(eggOk) eggOk.style.display = "none";
+     }
+       state.answered[idx] = optIdx;
+    optionEls.forEach(function(el, i){ el.classList.toggle("selected", i === optIdx); });
+    btnNext.disabled = false;
+
+    var isCorrect = optIdx === item.c;
+    if(isCorrect){ state.correctStreak++; state.wrongStreak = 0; } else { state.wrongStreak++; state.correctStreak = 0; }
+
+    if(idx === 1 && optIdx === 1) showReaction('不是吧？这你都敢选', "q2", false);
+    if(idx === 5 && optIdx === 3){
+      showReaction('<div style="font-size:13px;letter-spacing:.08em;">ERROR</div><div>无法理解你的选择<br>请问谁家好人会喊别人矛线呢？</div>', "q6", true);
+    }
+    if(idx === 8 && optIdx === 1) showReaction('你居然选这个？你死定啦', "q9", true);
+    if(idx === 11 && optIdx === 0) showReaction('嗯？你居然知道', "q12", false);
+    if(idx === 13 && optIdx === 0) showReaction('你也去看吧，墙裂推荐！', "q14", false);
+
+    checkAnomaly(idx,optIdx);
+    checkKeyQuestionThreshold();
+    if(state.correctStreak === 5) showReaction('连续答对了5次，有点东西。', "streak-correct-5", false);
+    if(state.correctStreak === 10) showReaction('连续答对了10次，咱俩关系最差的时候blackpink伯牙和子期', "streak-correct-10", false, 2400);
+    if(state.wrongStreak === 5) showReaction('连续答错了5次，你是不是对我有什么误解？', "streak-wrong-5", true);
+
+    if(idx === 27 && !isCorrect && state.answered[3] !== null && !isAnswerCorrect(QUESTIONS[3],state.answered[3])) showReaction('顺便提醒你一下，你第4题也答错了。', "nudge-28-4", true);
+    if(idx === 36 && !isCorrect && state.answered[34] !== null && !isAnswerCorrect(QUESTIONS[34],state.answered[34])) showReaction('顺便提醒你一下，你第35题也答错了。', "nudge-35-37", true);
   }
 
   function renderCommentItems(listEl, comments){
@@ -832,6 +1119,11 @@
   });
 
   btnNext.addEventListener("click", function(){
+    // 第61题答错后，必须完成“确定”流程才能继续，不能绕过提示。
+    if(state.current === 60 && state.answered[60] !== null && state.answered[60] !== QUESTIONS[60].c && !state.q61Confirmed){
+      btnNext.disabled = true;
+      return;
+    }
     if(state.current < QUESTIONS.length - 1){
       state.current++;
       renderQuestion();
@@ -869,6 +1161,84 @@
     return score;
   }
 
+  function buildQuizResult(){
+    var resultDetails = QUESTIONS.map(function(item, i){
+      var ans = state.answered[i];
+      var selectedIndexes = item.multi ? (Array.isArray(ans) ? ans.slice().sort() : []) : (ans === null ? [] : [ans]);
+      var correctIndexes = item.multi ? (Array.isArray(item.c) ? item.c.slice().sort() : []) : [item.c];
+      var selectedTexts = selectedIndexes.map(function(idx){ return item.o[idx]; }).filter(function(v){ return v != null; });
+      var correctTexts = correctIndexes.map(function(idx){ return item.o[idx]; }).filter(function(v){ return v != null; });
+      var letters = ["A","B","C","D"];
+      var selectedLetters = selectedIndexes.map(function(idx){ return letters[idx]; });
+      var correctLetters = correctIndexes.map(function(idx){ return letters[idx]; });
+      return {
+        question: i + 1,
+        questionText: item.q,
+        selected: selectedIndexes,
+        selectedLetters: selectedLetters,
+        selectedText: selectedTexts,
+        correct: correctIndexes,
+        correctLetters: correctLetters,
+        correctText: correctTexts,
+        isCorrect: item.multi
+          ? selectedIndexes.length === correctIndexes.length && selectedIndexes.every(function(v, idx){ return v === correctIndexes[idx]; })
+          : selectedIndexes.length === 1 && selectedIndexes[0] === correctIndexes[0]
+      };
+    });
+
+    return {
+      nickname: state.nickname || "匿名",
+      ts: Date.now(),
+      time: new Date().toLocaleString("zh-CN"),
+      score: state.correctCount,
+      total: QUESTIONS.length,
+      correctQuestions: resultDetails.filter(function(x){ return x.isCorrect; }).map(function(x){ return x.question; }),
+      wrongQuestions: resultDetails.filter(function(x){ return !x.isCorrect; }).map(function(x){ return x.question; }),
+      answers: resultDetails
+    };
+  }
+
+  var PREDICTIONS = {20:1,34:0,36:0,43:2,46:0,51:0,53:1,58:0,63:0};
+
+  function getRecognition(){
+    var niche = [51,55,62,63,64,65].reduce(function(n,i){ return n + (isAnswerCorrect(QUESTIONS[i],state.answered[i]) ? 1 : 0); },0);
+    var predictionHits = Object.keys(PREDICTIONS).reduce(function(n,k){ var i=Number(k); return n + (state.answered[i] === PREDICTIONS[i] ? 1 : 0); },0);
+    var score = state.correctCount;
+    if(niche >= 5) return {title:"「互联网考古型」",desc:"黑历史知道得比本人还多。"};
+    if(predictionHits <= 3 && score >= 35) return {title:"「刻板印象型」",desc:"你知道她喜欢什么，但你并不真正了解她为什么喜欢。"};
+    if(score >= 52) return {title:"「记细节型」",desc:"你知道很多冷门信息，但对她真正重要的东西反而漏掉了。"};
+    if(score >= 35) return {title:"「相处型」",desc:"很多事情你说不上来，但你就是知道她会怎么选。"};
+    return {title:"「表面熟悉型」",desc:"你对她有一个完整的印象，可惜这个印象里有不少是你自己想象出来的。"};
+  }
+
+  function renderResultExtras(){
+    var r=getRecognition();
+    document.getElementById("recognitionText").innerHTML='<strong>'+r.title+'</strong><br>'+r.desc;
+    var keys=Object.keys(PREDICTIONS).map(Number);
+    var guessed=keys.reduce(function(n,i){return n+(state.answered[i]===PREDICTIONS[i]?1:0);},0);
+    var actual=keys.reduce(function(n,i){return n+(isAnswerCorrect(QUESTIONS[i],state.answered[i])?1:0);},0);
+    var mismatch=keys.reduce(function(n,i){return n+(state.answered[i]===PREDICTIONS[i]&&!isAnswerCorrect(QUESTIONS[i],state.answered[i])?1:0);},0);
+    var truePrediction=keys.reduce(function(n,i){return n+(isAnswerCorrect(QUESTIONS[i],state.answered[i])&&state.answered[i]!==PREDICTIONS[i]?1:0);},0);
+    document.getElementById("predictionText").textContent='昭矛线觉得你会选的答案：'+guessed+' / '+keys.length+'\n而你真正选对的答案：'+actual+' / '+keys.length+'\n\n你有 '+mismatch+' 次选中了昭矛线觉得你会选择的答案，但她本人并不会真的这样选。'+'\n\n你有 '+truePrediction+' 次预判了昭矛线的预判，做出了真正正确的选择。';
+    var wrong=[]; QUESTIONS.forEach(function(item,i){if(!isAnswerCorrect(item,state.answered[i])) wrong.push(i);});
+    var summaryEl=document.getElementById("wrongReviewSummary");
+    summaryEl.textContent=wrong.length?'共 '+wrong.length+' 道错题':'一题没错。今天的你没有任何可以回放的黑历史。';
+    summaryEl.classList.remove("open");
+    var box=document.getElementById("wrongReview"); box.innerHTML=""; box.classList.remove("open");
+    if(wrong.length){
+      summaryEl.onclick=function(){ box.classList.toggle("open"); summaryEl.classList.toggle("open"); };
+    }else{ summaryEl.onclick=null; }
+    wrong.forEach(function(i){var item=QUESTIONS[i],ans=state.answered[i];var selected=item.multi?(Array.isArray(ans)?ans:[]).map(function(x){return LETTERS[x]+'. '+item.o[x];}).join('、'):(ans===null?'未作答':LETTERS[ans]+'. '+item.o[ans]);var correct=item.multi?item.c.map(function(x){return LETTERS[x]+'. '+item.o[x];}).join('、'):LETTERS[item.c]+'. '+item.o[item.c];box.innerHTML+='<div class="review-row"><div class="review-q">第 '+(i+1)+' 题</div><div>你选了：'+selected+'</div><div>正确答案：'+correct+'</div></div>';});
+  }
+
+  function runAnalysis(){
+    show("screen-analysis");
+    var fill=document.getElementById("analysisFill"),status=document.getElementById("analysisStatus"),linesEl=document.getElementById("analysisLines");
+    var lines=["你记得她喜欢什么。\n你记得她讨厌什么。\n但你显然忘掉了一些非常重要的东西。","有些冷门信息你记得比本人还清楚。\n有些本该知道的东西，你偏偏错得很认真。","你的答案已经看完了。\n接下来只是把结果算出来而已。"];
+    linesEl.textContent=""; var chosen=lines[Math.floor(Math.random()*lines.length)],n=0;
+    var timer=setInterval(function(){n+=4;if(n>100)n=100;fill.style.width=n+"%";if(n>=100){clearInterval(timer);status.textContent="分析完成。";linesEl.textContent=chosen;setTimeout(function(){show("screen-result");renderResultExtras();loadBoard();},1900);}},55);
+  }
+
   function finishQuiz(){
     var score = computeScore();
     state.correctCount = score;
@@ -882,6 +1252,7 @@
       tierDescEl.textContent = "";
       tierDescEl.classList.add("empty");
     }
+
     boardSubmitted = false;
     var submitBtn = document.getElementById("btnSubmitBoard");
     submitBtn.disabled = false;
@@ -893,11 +1264,9 @@
     document.getElementById("commentInput").value = "";
     currentCommentQuestion = null;
     document.getElementById("explainInput").value = "";
-    show("screen-result");
-    loadBoard();
-  }
-
-  document.getElementById("btnRetry").addEventListener("click", function(){
+    runAnalysis();
+     }
+     document.getElementById("btnRetry").addEventListener("click", function(){
     nicknameInput.value = "";
     nameErrorEl.style.display = "none";
     show("screen-nickname");
@@ -1070,8 +1439,7 @@
       entries.forEach(function(e, i){
         var li = document.createElement("li");
         var displayName = (e.nickname && String(e.nickname).trim()) ? String(e.nickname).trim() : "匿名";
-        var sameEntryName = state.nickname ? displayName === state.nickname : displayName === "匿名";
-        li.className = "board-row" + (sameEntryName && e.score === state.correctCount ? " me" : "");
+        li.className = "board-row";
         li.innerHTML = '<span class="rank">'+(i+1)+'</span><span class="name">'+escapeHtml(displayName)+'</span><span class="score">'+e.score+' 分</span>';
         boardListEl.appendChild(li);
       });
@@ -1105,6 +1473,13 @@
     btn.textContent = "上榜中...";
     try{
       await window.submitLeaderboardEntry(state.nickname || "匿名", state.correctCount);
+      if(typeof window.submitQuizResult === "function"){
+        try{
+          await window.submitQuizResult(buildQuizResult());
+        }catch(resultErr){
+          console.error("quiz result save error:", resultErr);
+        }
+      }
       boardSubmitted = true;
       btn.textContent = "已上榜";
       loadBoard();
@@ -1119,5 +1494,12 @@
 
 })();
 </script>
+  <div class="q61-threat-layer" id="q61ThreatLayer" aria-hidden="true"></div>
+  <div class="reaction-overlay" id="reactionOverlay" aria-hidden="true">
+    <div class="reaction-popup" id="reactionPopup" role="dialog" aria-modal="true">
+      <div id="reactionContent"></div>
+    </div>
+  </div>
 </body>
 </html>
+       
