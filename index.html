@@ -12,14 +12,15 @@
      LEADERBOARD BACKEND CONFIG
      This page uses kvdb.io — a free, no-login key-value store —
      so the leaderboard works on a plain static host like GitHub
-     Pages (no server needed). One-time setup before you deploy:
+     Pages (no server needed).
 
-     1. Run this once, anywhere with curl (terminal / Replit / etc):
+     The bucket ID below is already filled in and ready to deploy —
+     just push this file to a GitHub repo and enable GitHub Pages.
+
+     If you ever want a fresh bucket (e.g. to reset the leaderboard,
+     or start a separate one for a different quiz), run:
           curl -d "email=you@example.com" https://kvdb.io
-        It returns a bucket ID, e.g. "Fd55uogXyxYdnXJvnyN8Xo".
-     2. Paste that ID into KVDB_BUCKET_ID in the <script> below,
-        replacing "PASTE_YOUR_BUCKET_ID_HERE".
-     3. Push this file to a GitHub repo, enable GitHub Pages, done.
+     and swap the returned ID into KVDB_BUCKET_ID below.
 
      Note: this bucket has no password — anyone who has this page's
      source can read/write it. Fine for a casual leaderboard among
@@ -113,6 +114,20 @@
   }
   .btn:active{transform:translateY(1px);}
   .btn-primary{
+    background:var(--ink);
+    color:var(--panel);
+    border-color:var(--ink);
+  }
+  .btn:disabled, .btn-primary:disabled{
+    opacity:1;
+    cursor:not-allowed;
+  }
+  .btn:disabled{
+    background:var(--panel);
+    color:var(--ink);
+    border-color:var(--ink);
+  }
+  .btn-primary:disabled{
     background:var(--ink);
     color:var(--panel);
     border-color:var(--ink);
@@ -256,7 +271,8 @@
       <div id="multiTag" class="q-multi-tag" style="display:none;">这题选哪个都对，随便选</div>
       <div class="q-text" id="qText"></div>
       <div class="options" id="qOptions"></div>
-      <div class="nav-row">
+      <div class="nav-row" style="justify-content:space-between;">
+        <button class="btn" id="btnPrev" style="visibility:hidden;">上题选错了，再来</button>
         <button class="btn btn-primary" id="btnNext" disabled>下一题</button>
       </div>
     </div>
@@ -273,6 +289,7 @@
         <button class="btn" style="flex:1;" id="btnRetry">让我再蒙一次吧</button>
         <button class="btn btn-primary" style="flex:1;" id="btnSubmitBoard">上榜留名</button>
       </div>
+      <div id="boardSubmitError" style="display:none; color:var(--bad); font-weight:700; font-size:13px; margin-top:10px;"></div>
 
       <hr class="divider">
       <div class="board-title">对某道题有疑虑？解释都在这里哦</div>
@@ -283,6 +300,7 @@
       </div>
       <div id="explainResult" style="display:none; border:2px solid var(--ink); padding:12px 14px; margin-bottom:22px;">
         <div id="explainQ" style="font-weight:900; font-size:14px; margin-bottom:6px;"></div>
+        <div id="explainAnswer" style="font-weight:700; font-size:14px; color:var(--blue); margin-bottom:8px;"></div>
         <div id="explainText" style="font-size:14px; line-height:1.8; color:var(--ink-soft); white-space:pre-line;"></div>
       </div>
 
@@ -304,10 +322,10 @@
 (function(){
 
   // ---------- config ----------
-  var KVDB_BUCKET_ID = "PASTE_YOUR_BUCKET_ID_HERE";
+  var KVDB_BUCKET_ID = "3qxG8LmRwFJNnbXUbuHSpd";
   var KVDB_BASE = "https://kvdb.io/" + KVDB_BUCKET_ID;
   var KEY_PREFIX = "lb-";
-  var boardConfigured = KVDB_BUCKET_ID.indexOf("PASTE_YOUR") === -1;
+  var boardConfigured = true;
 
   // ---------- data ----------
   var QUESTIONS = [
@@ -354,14 +372,18 @@
   ];
 
   var TIERS = [
-    {min:0,  max:8,  title:"陌生的天使女孩",
+    {min:0,  max:0,  title:"排雷大师",
+      desc:"不是吧不是吧，你是怎么做到40道题全错的？这比全对的含金量还要高，您是我蛔虫里的肚子。"},
+    {min:1,  max:8,  title:"陌生的天使女孩",
       desc:"谢谢你来做我的测试～不管我们in不ins只要你做了我的测试并且没有对此嗤之以鼻我们就是好朋友，当然如果你是被我按头来做题的我会刊丝你哦"},
     {min:9,  max:16, title:"我们是点点点头之交吗",
-      desc:"以我题目的难度来说，好像能答对这些已经非常不容易了，谢谢你来做我的题还答对了这么多，你也太棒了吧"},
+      desc:"经过本人多番测试，随便乱选完全可以答对9-16题。不过如果你是认真作答的，我也不知道这难不难哈哈哈哈哈"},
     {min:17, max:24, title:"你是我大眼珠子互关吧",
       desc:"要么我和你有绿泡泡1个G以上的聊天记录要么我们是互关，又或者你真的用心看了我每一条发疯的朋友圈？否则我想不通你怎么能答对这么多题的"},
-    {min:25, max:31, title:"你在我huq住下了吧", desc:""},
-    {min:32, max:40, title:"这昭矛线您来做吧", desc:""}
+    {min:25, max:31, title:"你在我huq住下了吧",
+      desc:"G和小克都划分了这个梯度，我也不知道有没有人能答对这么多题，不管了"},
+    {min:32, max:40, title:"这昭矛线您来做吧",
+      desc:"原来真的能有人答对3/4以上?那你真的很了解我啦꒰˶>ᗜ<˶꒱谢谢你来做我的题还答对了这么多"}
   ];
 
   var EXPLANATIONS = [
@@ -389,7 +411,7 @@
     "有不明显的风险吗？",
     "我直接在天天在电脑上搜索和她有关的一切，看/玩了几乎所有 有她出现的影视剧、动画片、游戏好吧，现在依然喜欢每个ip的香香",
     "加起来有一万多次（当然我把我朋友发的哈也算上了不然数不过来）",
-    "橙子花是狸猫肥的师兄，祢衡是小广的猴猴师兄，曲正风是整个崖山的大师兄，而叶问舟更像我的师兄，而且叶问舟是一个特别温柔美好到有些失真的角色呀",
+    "橙子花是狸猫肥的师兄，祢衡是小广的猴猴师兄，曲正风是整个崖山的大师兄，而叶问舟更像是我的师兄，并且叶问舟是一个特别温柔美好到近乎失真的角色呀～",
     "看了有十遍了吧",
     "有种淡淡的温馨感",
     "我和小蝴蝶就是血脉相吸",
@@ -465,6 +487,7 @@
   var qTextEl = document.getElementById("qText");
   var qOptionsEl = document.getElementById("qOptions");
   var btnNext = document.getElementById("btnNext");
+  var btnPrev = document.getElementById("btnPrev");
   var progressLabel = document.getElementById("progressLabel");
   var progressFill = document.getElementById("progressFill");
   var multiTag = document.getElementById("multiTag");
@@ -483,10 +506,10 @@
     progressLabel.textContent = "第 " + (idx+1) + " / " + QUESTIONS.length + " 题";
     progressFill.style.width = (((idx+1)/QUESTIONS.length)*100) + "%";
     multiTag.style.display = item.multi ? "inline-block" : "none";
+    multiTag.textContent = "多选题·可以选多个选项";
     qTextEl.textContent = item.q;
     qOptionsEl.innerHTML = "";
-    btnNext.disabled = true;
-    btnNext.textContent = (idx === QUESTIONS.length-1) ? "查看结果" : "下一题";
+    btnPrev.style.visibility = (idx === 0) ? "hidden" : "visible";
 
     var letters = ["A","B","C","D"];
     item.o.forEach(function(optText, optIdx){
@@ -496,17 +519,42 @@
       btn.addEventListener("click", function(){ chooseOption(optIdx); });
       qOptionsEl.appendChild(btn);
     });
+
+    // restore a previously chosen answer for this question, if any
+    var prevAns = state.answered[idx];
+    var optionEls = qOptionsEl.querySelectorAll(".option");
+    var hasAnswer = item.multi ? (Array.isArray(prevAns) && prevAns.length > 0) : (prevAns !== null);
+    if(hasAnswer){
+      optionEls.forEach(function(el, i){
+        var isSelected = item.multi ? prevAns.indexOf(i) !== -1 : i === prevAns;
+        el.classList.toggle("selected", isSelected);
+      });
+    }
+    btnNext.disabled = !hasAnswer;
+    btnNext.textContent = (idx === QUESTIONS.length-1) ? "查看结果" : "下一题";
   }
 
   function chooseOption(optIdx){
-    state.answered[state.current] = optIdx;
-
+    var item = QUESTIONS[state.current];
     var optionEls = qOptionsEl.querySelectorAll(".option");
-    optionEls.forEach(function(el, i){
-      el.classList.toggle("selected", i === optIdx);
-    });
 
-    btnNext.disabled = false;
+    if(item.multi){
+      var picked = state.answered[state.current];
+      if(!Array.isArray(picked)) picked = [];
+      var pos = picked.indexOf(optIdx);
+      if(pos === -1) picked.push(optIdx); else picked.splice(pos, 1);
+      state.answered[state.current] = picked;
+      optionEls.forEach(function(el, i){
+        el.classList.toggle("selected", picked.indexOf(i) !== -1);
+      });
+      btnNext.disabled = picked.length === 0;
+    } else {
+      state.answered[state.current] = optIdx;
+      optionEls.forEach(function(el, i){
+        el.classList.toggle("selected", i === optIdx);
+      });
+      btnNext.disabled = false;
+    }
   }
 
   btnNext.addEventListener("click", function(){
@@ -515,6 +563,13 @@
       renderQuestion();
     } else {
       finishQuiz();
+    }
+  });
+
+  btnPrev.addEventListener("click", function(){
+    if(state.current > 0){
+      state.current--;
+      renderQuestion();
     }
   });
 
@@ -528,9 +583,12 @@
     var score = 0;
     for(var i=0;i<QUESTIONS.length;i++){
       var ans = state.answered[i];
-      if(ans === null) continue;
       var item = QUESTIONS[i];
-      if(item.multi || ans === item.c) score++;
+      if(item.multi){
+        if(Array.isArray(ans) && ans.length > 0) score++;
+      } else {
+        if(ans !== null && ans === item.c) score++;
+      }
     }
     return score;
   }
@@ -552,6 +610,7 @@
     var submitBtn = document.getElementById("btnSubmitBoard");
     submitBtn.disabled = false;
     submitBtn.textContent = "上榜留名";
+    document.getElementById("boardSubmitError").style.display = "none";
     document.getElementById("configNote").style.display = boardConfigured ? "none" : "block";
     document.getElementById("explainResult").style.display = "none";
     document.getElementById("explainInput").value = "";
@@ -570,17 +629,22 @@
   var explainInput = document.getElementById("explainInput");
   var explainResult = document.getElementById("explainResult");
   var explainQ = document.getElementById("explainQ");
+  var explainAnswer = document.getElementById("explainAnswer");
   var explainText = document.getElementById("explainText");
+  var LETTERS = ["A","B","C","D"];
 
   document.getElementById("btnExplain").addEventListener("click", function(){
     var n = parseInt(explainInput.value, 10);
     if(!n || n < 1 || n > QUESTIONS.length){
       explainResult.style.display = "block";
       explainQ.textContent = "";
+      explainAnswer.textContent = "";
       explainText.textContent = "填个 1 到 " + QUESTIONS.length + " 之间的题号叭";
       return;
     }
-    explainQ.textContent = "第 " + n + " 题：" + QUESTIONS[n-1].q;
+    var item = QUESTIONS[n-1];
+    explainQ.textContent = "第 " + n + " 题：" + item.q;
+    explainAnswer.textContent = item.multi ? "本题多选，选哪个都算对" : (LETTERS[item.c] + ". " + item.o[item.c]);
     explainText.textContent = EXPLANATIONS[n-1];
     explainResult.style.display = "block";
   });
@@ -641,6 +705,8 @@
   document.getElementById("btnSubmitBoard").addEventListener("click", async function(){
     if(boardSubmitted) return;
     var btn = this;
+    var errEl = document.getElementById("boardSubmitError");
+    errEl.style.display = "none";
     if(!boardConfigured){
       document.getElementById("configNote").style.display = "block";
       return;
@@ -657,11 +723,15 @@
         loadBoard();
       } else {
         btn.disabled = false;
-        btn.textContent = "上榜失败（状态码 " + res.status + "，再试一次）";
+        btn.textContent = "上榜留名";
+        errEl.textContent = "上榜失败（状态码 " + res.status + "，再试一次）";
+        errEl.style.display = "block";
       }
     }catch(err){
       btn.disabled = false;
-      btn.textContent = "上榜失败（网络/跨域被拦，再试一次）";
+      btn.textContent = "上榜留名";
+      errEl.textContent = "上榜失败（网络/跨域被拦，再试一次）";
+      errEl.style.display = "block";
       console.error("kvdb submit error:", err);
     }
   });
